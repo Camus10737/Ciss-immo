@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Edit, Trash2, Building2, MapPin, Users } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Building2, MapPin, Users, Eye } from 'lucide-react';
 import { FilterOptions, Immeuble } from '@/app/types';
 import { immeublesService } from '@/app/services/immeublesService';
 import { BuildingForm } from './buildingForm';
 import { BuildingDetail } from './buildingDetail';
+
 
 export function BuildingList() { 
   const [immeubles, setImmeubles] = useState<Immeuble[]>([]);
@@ -95,13 +96,13 @@ export function BuildingList() {
   const getBadgeColor = (type: string) => {
     switch (type) {
       case 'habitation':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'commercial':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'mixte':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-50 text-purple-700 border-purple-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -130,31 +131,36 @@ export function BuildingList() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header avec bouton d'ajout */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-blue-700">Gestion des immeubles</h2>
-          <p className="text-gray-600">Gérez vos biens immobiliers et leurs appartements</p>
+    <div className="space-y-8">
+      {/* Header moderne */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestion des immeubles</h1>
+            <p className="text-gray-600">Gérez vos biens immobiliers et leurs appartements</p>
+          </div>
+          <Button 
+            onClick={handleNouvelImmeuble} 
+            className="bg-blue-600 hover:bg-blue-700 shadow-sm transition-all duration-200"
+          >
+            <Plus size={18} className="mr-2" />
+            Nouvel immeuble
+          </Button>
         </div>
-        <Button onClick={handleNouvelImmeuble} className="bg-blue-600 hover:bg-blue-700">
-          <Plus size={20} className="mr-2" />
-          Nouvel immeuble
-        </Button>
       </div>
 
       {/* Filtres et recherche */}
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="bg-white border-0 shadow-sm">
+        <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Recherche */}
             <div className="relative">
-              <Search size={20} className="absolute left-3 top-3 text-gray-400" />
+              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Rechercher un immeuble..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
 
@@ -162,7 +168,7 @@ export function BuildingList() {
             <Select value={filters.ville || 'all'} onValueChange={(value) => 
               setFilters(prev => ({ ...prev, ville: value === 'all' ? undefined : value }))
             }>
-              <SelectTrigger>
+              <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="Toutes les villes" />
               </SelectTrigger>
               <SelectContent>
@@ -177,7 +183,7 @@ export function BuildingList() {
             <Select value={filters.type || 'all'} onValueChange={(value) => 
               setFilters(prev => ({ ...prev, type: value === 'all' ? undefined : value as any }))
             }>
-              <SelectTrigger>
+              <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="Tous les types" />
               </SelectTrigger>
               <SelectContent>
@@ -192,7 +198,7 @@ export function BuildingList() {
             <Button 
               variant="outline" 
               onClick={() => setFilters({})}
-              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+              className="border-gray-200 hover:bg-gray-50"
             >
               Réinitialiser
             </Button>
@@ -202,22 +208,33 @@ export function BuildingList() {
 
       {/* Messages d'erreur */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <p className="text-red-800 font-medium">{error}</p>
         </div>
       )}
 
       {/* Liste des immeubles */}
       {loading ? (
-        <div className="text-center py-8">
-          <p className="text-gray-600">Chargement des immeubles...</p>
+        <div className="text-center py-12">
+          <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-blue-600 bg-blue-50 transition ease-in-out duration-150">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Chargement des immeubles...
+          </div>
         </div>
       ) : immeublesFiltres.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Building2 size={48} className="mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600">Aucun immeuble trouvé</p>
-            <Button onClick={handleNouvelImmeuble} className="mt-4 bg-blue-600 hover:bg-blue-700">
+        <Card className="bg-white border-0 shadow-sm">
+          <CardContent className="text-center py-12">
+            <Building2 size={64} className="mx-auto text-gray-300 mb-6" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun immeuble trouvé</h3>
+            <p className="text-gray-600 mb-6">Commencez par créer votre premier immeuble</p>
+            <Button 
+              onClick={handleNouvelImmeuble} 
+              className="bg-blue-600 hover:bg-blue-700 shadow-sm"
+            >
+              <Plus size={18} className="mr-2" />
               Créer votre premier immeuble
             </Button>
           </CardContent>
@@ -225,64 +242,67 @@ export function BuildingList() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {immeublesFiltres.map((immeuble) => (
-            <Card key={immeuble.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="pb-3">
+            <Card key={immeuble.id} className="bg-white border-0 shadow-sm hover:shadow-md transition-all duration-200 group">
+              <CardHeader className="pb-4">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg text-blue-700">{immeuble.nom}</CardTitle>
+                  <CardTitle className="text-xl text-gray-900 group-hover:text-blue-700 transition-colors">
+                    {immeuble.nom}
+                  </CardTitle>
                   <Badge className={getBadgeColor(immeuble.type)}>
                     {immeuble.type}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {/* Localisation */}
-                  <div className="flex items-center text-gray-600">
-                    <MapPin size={16} className="mr-2" />
-                    <span className="text-sm">
-                      {immeuble.ville} • {immeuble.quartier} • {immeuble.secteur}
-                    </span>
-                  </div>
+              <CardContent className="space-y-4">
+                {/* Localisation */}
+                <div className="flex items-center text-gray-600">
+                  <MapPin size={16} className="mr-3 text-blue-500" />
+                  <span className="text-sm">
+                    {immeuble.ville} • {immeuble.quartier} • {immeuble.secteur}
+                  </span>
+                </div>
 
-                  {/* Informations */}
-                  <div className="flex items-center text-gray-600">
-                    <Users size={16} className="mr-2" />
-                    <span className="text-sm">
-                      {immeuble.nombreAppartements} appartement{immeuble.nombreAppartements > 1 ? 's' : ''}
-                    </span>
-                  </div>
+                {/* Informations */}
+                <div className="flex items-center text-gray-600">
+                  <Users size={16} className="mr-3 text-blue-500" />
+                  <span className="text-sm">
+                    {immeuble.nombreAppartements} appartement{immeuble.nombreAppartements > 1 ? 's' : ''}
+                  </span>
+                </div>
 
-                  {/* Propriétaire */}
-                  <div className="text-sm text-gray-600">
-                    <strong>Propriétaire :</strong> {immeuble.proprietaireActuel.prenom} {immeuble.proprietaireActuel.nom}
-                  </div>
+                {/* Propriétaire */}
+                <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+                  <span className="font-medium text-gray-900">Propriétaire :</span>
+                  <br />
+                  {immeuble.proprietaireActuel.prenom} {immeuble.proprietaireActuel.nom}
+                </div>
 
-                  {/* Actions */}
-                  <div className="flex space-x-2 pt-3 border-t">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleVoirDetail(immeuble)}
-                      className="flex-1"
-                    >
-                      Voir détails
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleModifierImmeuble(immeuble)}
-                    >
-                      <Edit size={16} />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleSupprimerImmeuble(immeuble.id)}
-                      className="text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
+                {/* Actions */}
+                <div className="flex space-x-2 pt-4 border-t border-gray-100">
+                  <Button 
+                    size="sm" 
+                    onClick={() => handleVoirDetail(immeuble)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Eye size={16} className="mr-2" />
+                    Détails
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleModifierImmeuble(immeuble)}
+                    className="border-gray-200 hover:bg-gray-50"
+                  >
+                    <Edit size={16} />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleSupprimerImmeuble(immeuble.id)}
+                    className="border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
                 </div>
               </CardContent>
             </Card>

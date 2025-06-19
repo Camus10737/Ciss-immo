@@ -8,7 +8,7 @@ export interface Locataire {
   dateSortie?: Date; // null si locataire actuel
   finBailProbable?: Date; // Date de fin de bail prévue
   appartementId: string;
-  userId: string; // ID du propriétaire/gestionnaire
+  userId: string; 
   createdAt: Date;
   updatedAt: Date;
 }

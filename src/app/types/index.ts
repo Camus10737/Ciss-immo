@@ -72,20 +72,20 @@ export interface FilterOptions {
   secteur?: string;
   type?: 'habitation' | 'commercial' | 'mixte';
 }
-export interface LocataireFormData {
-  nom: string;
-  prenom: string;
-  email?: string;
-  telephone?: string;
-  dateEntree: Date;
-  finBailProbable?: Date;
-  appartementId: string;
-}
+// export interface LocataireFormData {
+//   nom: string;
+//   prenom: string;
+//   email?: string;
+//   telephone?: string;
+//   dateEntree: Date;
+//   finBailProbable?: Date;
+//   appartementId: string;
+// }
 
-export interface LocataireFilters {
-  immeuble?: string;
-  quartier?: string;
-  secteur?: string;
-  statut?: 'actif' | 'sorti' | 'tous';
-  recherche?: string;
-}
+// export interface LocataireFilters {
+//   immeuble?: string;
+//   quartier?: string;
+//   secteur?: string;
+//   statut?: 'actif' | 'sorti' | 'tous';
+//   recherche?: string;
+// }

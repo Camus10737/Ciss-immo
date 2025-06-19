@@ -1,19 +1,19 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { UserPlus, ArrowLeft, Building2, User, Phone, Calendar } from "lucide-react"
+import { UserPlus, ArrowLeft, Building2, User, Phone, Calendar, Home, Lock } from "lucide-react"
 import { createLocataire, updateLocataire } from "@/app/services/locatairesService"
 import { useAuth } from "@/hooks/useAuth"
 import type { LocataireFormData } from "@/app/types/locataires"
 import { immeublesService } from "@/app/services/immeublesService"
+import type { Immeuble } from "@/app/types"
 
 interface TenantFormProps {
   initialData?: Partial<LocataireFormData>
@@ -23,7 +23,15 @@ interface TenantFormProps {
 
 export default function TenantForm({ initialData, isEditing = false, locataireId }: TenantFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
+
+  // Récupérer les paramètres URL
+  const appartementIdFromUrl = searchParams.get('appartementId')
+  const immeubleIdFromUrl = searchParams.get('immeubleId')
+  const appartementNumeroFromUrl = searchParams.get('appartementNumero')
+  const immeubleNomFromUrl = searchParams.get('immeubleNom')
+  const retourFromUrl = searchParams.get('retour')
 
   const [formData, setFormData] = useState<LocataireFormData>({
     nom: initialData?.nom || "",
@@ -32,31 +40,69 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
     telephone: initialData?.telephone || "",
     dateEntree: initialData?.dateEntree || new Date(),
     finBailProbable: initialData?.finBailProbable || undefined,
-    appartementId: initialData?.appartementId || "",
+    appartementId: initialData?.appartementId || appartementIdFromUrl || "",
   })
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [appartements, setAppartements] = useState<Array<{ id: string; nom: string; immeubleNom: string }>>([])
-  const [loadingAppartements, setLoadingAppartements] = useState(true)
+  
+  // 🔥 NOUVEAU : États pour la sélection en cascade
+  const [immeubles, setImmeubles] = useState<Immeuble[]>([])
+  const [immeubleSelectionne, setImmeubleSelectionne] = useState<string>(immeubleIdFromUrl || "")
+  const [loadingImmeubles, setLoadingImmeubles] = useState(true)
 
-  // Charger les appartements disponibles au montage du composant
+  // État pour l'appartement pré-sélectionné
+  const [appartementPreselectionne, setAppartementPreselectionne] = useState<{
+    numero: string;
+    immeubleNom: string;
+  } | null>(null)
+
+  // 🔥 NOUVEAU : Charger tous les immeubles au lieu des appartements disponibles
   useEffect(() => {
-    const chargerAppartements = async () => {
+    const chargerImmeubles = async () => {
       try {
-        const result = await immeublesService.obtenirAppartementsDisponibles()
+        const result = await immeublesService.obtenirImmeubles()
         if (result.success && result.data) {
-          setAppartements(result.data)
+          setImmeubles(result.data)
         }
       } catch (error) {
-        console.error("Erreur lors du chargement des appartements:", error)
+        console.error("Erreur lors du chargement des immeubles:", error)
       } finally {
-        setLoadingAppartements(false)
+        setLoadingImmeubles(false)
       }
     }
 
-    chargerAppartements()
+    chargerImmeubles()
   }, [])
+
+  // Gérer l'appartement pré-sélectionné depuis l'URL
+  useEffect(() => {
+    if (appartementIdFromUrl && appartementNumeroFromUrl && immeubleNomFromUrl) {
+      setAppartementPreselectionne({
+        numero: appartementNumeroFromUrl,
+        immeubleNom: immeubleNomFromUrl
+      })
+    }
+  }, [appartementIdFromUrl, appartementNumeroFromUrl, immeubleNomFromUrl])
+
+  // 🔥 NOUVEAU : Obtenir les appartements de l'immeuble sélectionné
+  const getAppartementsImmeuble = () => {
+    if (!immeubleSelectionne) return []
+    
+    const immeuble = immeubles.find(imm => imm.id === immeubleSelectionne)
+    return immeuble?.appartements || []
+  }
+
+  // 🔥 NOUVEAU : Gérer la sélection d'immeuble
+  const handleImmeubleChange = (immeubleId: string) => {
+    setImmeubleSelectionne(immeubleId)
+    // Réinitialiser la sélection d'appartement
+    setFormData(prev => ({ ...prev, appartementId: "" }))
+    // Effacer l'erreur d'appartement
+    if (errors.appartementId) {
+      setErrors(prev => ({ ...prev, appartementId: "" }))
+    }
+  }
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -69,6 +115,9 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
     }
     if (!formData.telephone || !formData.telephone.trim()) {
       newErrors.telephone = "Le téléphone est requis"
+    }
+    if (!immeubleSelectionne) {
+      newErrors.immeuble = "Veuillez sélectionner un immeuble"
     }
     if (!formData.appartementId) {
       newErrors.appartementId = "Veuillez sélectionner un appartement"
@@ -89,13 +138,17 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
     setLoading(true)
     try {
       if (isEditing && locataireId) {
-        // Utiliser la fonction de mise à jour réelle
         await updateLocataire(locataireId, formData)
       } else {
         await createLocataire(formData, user.uid)
       }
 
-router.push('/dashboard?section=locataires');
+      // Navigation intelligente selon le retour
+      if (retourFromUrl === 'immeuble' && immeubleIdFromUrl) {
+        router.push(`/dashboard?section=immeubles&action=detail&id=${immeubleIdFromUrl}&tab=appartements`)
+      } else {
+        router.push('/dashboard?section=locataires')
+      }
     } catch (error) {
       console.error("Erreur lors de la sauvegarde:", error)
       alert("Erreur lors de la sauvegarde")
@@ -106,9 +159,16 @@ router.push('/dashboard?section=locataires');
 
   const handleInputChange = (field: keyof LocataireFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    // Effacer l'erreur si le champ devient valide
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }))
+    }
+  }
+
+  const handleRetour = () => {
+    if (retourFromUrl === 'immeuble' && immeubleIdFromUrl) {
+      router.push(`/dashboard?section=immeubles&action=detail&id=${immeubleIdFromUrl}`)
+    } else {
+      router.push('/dashboard?section=locataires')
     }
   }
 
@@ -128,11 +188,27 @@ router.push('/dashboard?section=locataires');
           </p>
         </div>
 
+        {/* Affichage de l'appartement pré-sélectionné */}
+        {appartementPreselectionne && (
+          <div className="max-w-4xl mx-auto mb-6">
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-center space-x-3 text-blue-700">
+                  <Home size={20} />
+                  <span className="font-medium">
+                    Appartement sélectionné : Apt. {appartementPreselectionne.numero} - {appartementPreselectionne.immeubleNom}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Bouton retour */}
         <div className="flex justify-center mb-8">
           <Button
             variant="outline"
-            onClick={() => router.back()}
+            onClick={handleRetour}
             className="border-blue-200 text-blue-700 hover:bg-blue-50"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -228,46 +304,119 @@ router.push('/dashboard?section=locataires');
                 </div>
               </div>
 
-              {/* Section Appartement */}
+              {/* 🔥 NOUVEAU : Section Logement avec sélection en cascade */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                     <Building2 className="h-4 w-4 text-blue-600" />
                   </div>
-                  <h3 className="text-lg font-semibold text-blue-900">Appartement</h3>
+                  <h3 className="text-lg font-semibold text-blue-900">Logement</h3>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-blue-900 font-medium">Appartement *</Label>
-                  {loadingAppartements ? (
-                    <div className="p-4 text-center text-blue-600 bg-blue-50 rounded-lg">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                      Chargement des appartements...
-                    </div>
-                  ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Sélection d'immeuble */}
+                  <div className="space-y-2">
+                    <Label className="text-blue-900 font-medium">Immeuble *</Label>
+                    {loadingImmeubles ? (
+                      <div className="p-4 text-center text-blue-600 bg-blue-50 rounded-lg">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        Chargement des immeubles...
+                      </div>
+                    ) : (
+                      <Select
+                        value={immeubleSelectionne}
+                        onValueChange={handleImmeubleChange}
+                      >
+                        <SelectTrigger
+                          className={`border-blue-200 focus:border-blue-500 focus:ring-blue-500 ${errors.immeuble ? "border-red-500" : ""}`}
+                        >
+                          <SelectValue placeholder="Sélectionner un immeuble" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {immeubles.map((immeuble) => (
+                            <SelectItem key={immeuble.id} value={immeuble.id}>
+                              <div className="flex items-center space-x-2">
+                                <Building2 size={16} />
+                                <span>{immeuble.nom}</span>
+                                <span className="text-xs text-gray-500">
+                                  ({immeuble.ville} - {immeuble.quartier})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {errors.immeuble && <p className="text-red-500 text-sm">{errors.immeuble}</p>}
+                  </div>
+
+                  {/* Sélection d'appartement */}
+                  <div className="space-y-2">
+                    <Label className="text-blue-900 font-medium">Appartement *</Label>
                     <Select
                       value={formData.appartementId}
                       onValueChange={(value) => handleInputChange("appartementId", value)}
+                      disabled={!immeubleSelectionne}
                     >
                       <SelectTrigger
                         className={`border-blue-200 focus:border-blue-500 focus:ring-blue-500 ${errors.appartementId ? "border-red-500" : ""}`}
                       >
-                        <SelectValue placeholder="Sélectionner un appartement" />
+                        <SelectValue 
+                          placeholder={
+                            !immeubleSelectionne 
+                              ? "Sélectionnez d'abord un immeuble" 
+                              : "Sélectionner un appartement"
+                          } 
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {appartements.length === 0 ? (
-                          <div className="p-4 text-center text-gray-500">Aucun appartement disponible</div>
-                        ) : (
-                          appartements.map((apt) => (
-                            <SelectItem key={apt.id} value={apt.id}>
-                              {apt.nom}
-                            </SelectItem>
-                          ))
+                        {getAppartementsImmeuble().map((appartement) => (
+                          <SelectItem 
+                            key={appartement.id} 
+                            value={appartement.id}
+                            disabled={appartement.statut === 'occupe'}
+                            className={appartement.statut === 'occupe' ? "opacity-50 cursor-not-allowed" : ""}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center space-x-2">
+                                {appartement.statut === 'occupe' ? (
+                                  <Lock size={16} className="text-gray-400" />
+                                ) : (
+                                  <Home size={16} className="text-green-600" />
+                                )}
+                                <span className={appartement.statut === 'occupe' ? "text-gray-400" : ""}>
+                                  Apt. {appartement.numero}
+                                </span>
+                              </div>
+                              {appartement.statut === 'occupe' && appartement.locataireActuel && (
+                                <span className="text-xs text-gray-400 ml-2">
+                                  Occupé par {appartement.locataireActuel.prenom} {appartement.locataireActuel.nom}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                        {getAppartementsImmeuble().length === 0 && immeubleSelectionne && (
+                          <div className="p-4 text-center text-gray-500">
+                            Aucun appartement dans cet immeuble
+                          </div>
                         )}
                       </SelectContent>
                     </Select>
-                  )}
-                  {errors.appartementId && <p className="text-red-500 text-sm">{errors.appartementId}</p>}
+                    {errors.appartementId && <p className="text-red-500 text-sm">{errors.appartementId}</p>}
+                    
+                    {/* Indicateur du nombre d'appartements libres/occupés */}
+                    {immeubleSelectionne && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        {(() => {
+                          const appartements = getAppartementsImmeuble()
+                          const libres = appartements.filter(apt => apt.statut === 'libre').length
+                          const occupes = appartements.filter(apt => apt.statut === 'occupe').length
+                          return `${libres} libre(s) • ${occupes} occupé(s)`
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -316,7 +465,7 @@ router.push('/dashboard?section=locataires');
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.back()}
+                  onClick={handleRetour}
                   className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50 py-3"
                 >
                   Annuler
