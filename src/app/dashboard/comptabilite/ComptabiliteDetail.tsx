@@ -1,14 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useLocataires } from "@/hooks/useLocataires";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calculator, TrendingUp, Receipt, FileBarChart2, DollarSign } from "lucide-react";
 import { DepotRecuForm } from "./components/DepotRecuForm";
 import { ValidationRecusAdmin } from "./components/ValidationRecusAdmin";
 
-export function ComptabiliteDetail({ locataireId, appartementId, isAdmin }) {
+export function ComptabiliteDetail({ appartementId, isAdmin }) {
   const [activeTab, setActiveTab] = useState("revenus");
+  const { locataires, loading } = useLocataires();
+
+  // Filtrer les locataires actuels (pas de dateSortie)
+  const locatairesActuels = (locataires || []).filter(l => !l.dateSortie);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -90,7 +95,11 @@ export function ComptabiliteDetail({ locataireId, appartementId, isAdmin }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <DepotRecuForm locataireId={locataireId} appartementId={appartementId} />
+              {loading ? (
+                <div>Chargement des locataires...</div>
+              ) : (
+                <DepotRecuForm locataires={locatairesActuels} appartementId={appartementId} />
+              )}
             </CardContent>
           </Card>
         )}
