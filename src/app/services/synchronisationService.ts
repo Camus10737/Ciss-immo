@@ -196,7 +196,7 @@ export const synchronisationService = {
         appartements[appartementIndex] = {
           ...appartements[appartementIndex],
           statut: 'libre',
-          locataireActuel: undefined,
+          locataireActuel: null,
           updatedAt: new Date()
         };
         

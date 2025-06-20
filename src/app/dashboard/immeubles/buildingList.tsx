@@ -118,17 +118,24 @@ export function BuildingList() {
   }
 
   if (showDetail && selectedImmeuble) {
-    return (
-      <BuildingDetail
-        immeuble={selectedImmeuble}
-        onBack={() => setShowDetail(false)}
-        onEdit={() => {
-          setShowDetail(false);
-          handleModifierImmeuble(selectedImmeuble);
-        }}
-      />
-    );
-  }
+  return (
+    <BuildingDetail
+      immeuble={selectedImmeuble}
+      onBack={() => setShowDetail(false)}
+      onEdit={() => {
+        setShowDetail(false);
+        handleModifierImmeuble(selectedImmeuble);
+      }}
+      onRefresh={async () => {
+        await chargerImmeubles();
+        const refreshed = await immeublesService.obtenirImmeuble(selectedImmeuble.id);
+        if (refreshed.success && refreshed.data) {
+          setSelectedImmeuble(refreshed.data);
+        }
+      }}
+    />
+  );
+}
 
   return (
     <div className="space-y-8">
