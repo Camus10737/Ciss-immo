@@ -1,18 +1,17 @@
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, updateDoc, doc, query, where, Timestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { RecuPaiement } from "@/app/types/recus";
 
 const COLLECTION_NAME = "recus";
 
 export const recuService = {
-  async creerRecu(locataireId: string, appartementId: string, moisPayes: number, fichier: File): Promise<void> {
-    // 1. Upload du fichier
-    const storageRef = ref(storage, `recus/${locataireId}_${Date.now()}_${fichier.name}`);
-    await uploadBytes(storageRef, fichier);
-    const fichierUrl = await getDownloadURL(storageRef);
-
-    // 2. Ajout du reçu dans Firestore
+  // Modifié : fichierUrl est une string (URL Cloudinary)
+  async creerRecu(
+    locataireId: string,
+    appartementId: string,
+    moisPayes: number,
+    fichierUrl: string
+  ): Promise<void> {
     await addDoc(collection(db, COLLECTION_NAME), {
       locataireId,
       appartementId,

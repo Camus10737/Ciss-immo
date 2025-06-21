@@ -7,14 +7,13 @@ interface Locataire {
   id: string;
   nom: string;
   prenom: string;
+  appartementId: string; // <-- ajoute ce champ
 }
 
 export function DepotRecuForm({
   locataires = [],
-  appartementId,
 }: {
   locataires: Locataire[];
-  appartementId: string;
 }) {
   const [selectedLocataire, setSelectedLocataire] = useState<string>("");
   const [moisPayes, setMoisPayes] = useState(1);
@@ -22,9 +21,12 @@ export function DepotRecuForm({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Trouve le locataire sélectionné dans le tableau
+  const selectedLocataireObj = locataires.find(l => l.id === selectedLocataire);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLocataire) {
+    if (!selectedLocataireObj) {
       setMessage("Veuillez sélectionner un locataire.");
       return;
     }
@@ -35,7 +37,30 @@ export function DepotRecuForm({
     setLoading(true);
     setMessage(null);
     try {
-      await recuService.creerRecu(selectedLocataire, appartementId, moisPayes, file);
+      // 1. Upload du fichier sur Cloudinary via l'API route
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload-recu", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de l'upload Cloudinary");
+      }
+
+      const data = await res.json();
+      const fichierUrl = data.url;
+
+      // 2. Utilise l'appartementId du locataire sélectionné
+      await recuService.creerRecu(
+        selectedLocataireObj.id,
+        selectedLocataireObj.appartementId,
+        moisPayes,
+        fichierUrl
+      );
+
       setMessage("Reçu envoyé avec succès !");
       setFile(null);
       setMoisPayes(1);

@@ -98,7 +98,7 @@ export function ComptabiliteDetail({ appartementId, isAdmin }) {
               {loading ? (
                 <div>Chargement des locataires...</div>
               ) : (
-                <DepotRecuForm locataires={locatairesActuels} appartementId={appartementId} />
+                <DepotRecuForm locataires={locatairesActuels} />
               )}
             </CardContent>
           </Card>
@@ -153,11 +153,7 @@ export function ComptabiliteDetail({ appartementId, isAdmin }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isAdmin ? (
-                <ValidationRecusAdmin />
-              ) : (
-                <div className="text-gray-500">Accès réservé à l’administrateur.</div>
-              )}
+              <ValidationRecusAdmin />
             </CardContent>
           </Card>
         )}
