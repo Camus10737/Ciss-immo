@@ -28,7 +28,6 @@ interface TenantDetailsProps {
   onModificationSuccess: () => void
 }
 
-// 🔥 CORRECTION : Export par défaut
 export default function TenantDetails({ 
   locataire, 
   onRetour, 
