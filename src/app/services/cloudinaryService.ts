@@ -2,6 +2,7 @@ import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'clo
 
 class CloudinaryService {
   constructor() {
+<<<<<<< HEAD
     // Debug temporaire
     console.log('Cloudinary config:', {
       cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -9,6 +10,8 @@ class CloudinaryService {
       api_secret: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'MISSING'
     });
     
+=======
+>>>>>>> origin/Moussa
     cloudinary.config({
       cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
@@ -22,7 +25,11 @@ class CloudinaryService {
         cloudinary.uploader
           .upload_stream(
             {
+<<<<<<< HEAD
             resource_type: 'raw', // ← Changé de 'auto' à 'raw' pour les PDFs
+=======
+              resource_type: 'auto', 
+>>>>>>> origin/Moussa
               upload_preset: 'recus_preset',
               folder: 'recus',
               public_id: `${Date.now()}-${fileName}`,

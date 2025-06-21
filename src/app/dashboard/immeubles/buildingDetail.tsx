@@ -1,61 +1,98 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Edit, Building2, MapPin, User, Phone, Mail, Calendar, Home, UserCheck, UserX, History, TrendingUp } from 'lucide-react';
-import { Immeuble } from '@/app/types';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ArrowLeft,
+  Edit,
+  Building2,
+  MapPin,
+  User,
+  Phone,
+  Mail,
+  Calendar,
+  Home,
+  UserCheck,
+  UserX,
+  History,
+  TrendingUp,
+} from "lucide-react";
+import { Immeuble } from "@/app/types";
+import { marquerSortieLocataire } from "@/app/services/locatairesService";
+import { useLocataires } from "@/hooks/useLocataires";
 
 interface BuildingDetailProps {
   immeuble: Immeuble;
   onBack: () => void;
   onEdit: () => void;
+  onRefresh: () => void;
 }
 
-export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps) {
-  const [activeTab, setActiveTab] = useState('infos');
+export function BuildingDetail({
+  immeuble,
+  onBack,
+  onEdit,
+  onRefresh,
+}: BuildingDetailProps) {
+  const [activeTab, setActiveTab] = useState("infos");
   const router = useRouter();
 
   const getBadgeColor = (type: string) => {
     switch (type) {
-      case 'habitation':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'commercial':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'mixte':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
+      case "habitation":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      case "commercial":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "mixte":
+        return "bg-purple-50 text-purple-700 border-purple-200";
       default:
-        return 'bg-gray-50 text-gray-700 border-gray-200';
+        return "bg-gray-50 text-gray-700 border-gray-200";
     }
   };
 
+  const handleSortie = async (id: string, nom: string, prenom: string) => {
+    await marquerSortieLocataire(id);
+    onRefresh();
+  };
   const getStatutBadge = (statut: string) => {
-    return statut === 'occupe' 
-      ? <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Occupé</Badge>
-      : <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Libre</Badge>;
+    return statut === "occupe" ? (
+      <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
+        Occupé
+      </Badge>
+    ) : (
+      <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">
+        Libre
+      </Badge>
+    );
   };
 
+  const { marquerSortie, loading } = useLocataires();
+
   const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('fr-FR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return new Intl.DateTimeFormat("fr-FR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     }).format(date);
   };
 
   // 🔥 NOUVELLE FONCTION : Naviguer vers l'ajout de locataire
-  const handleAjouterLocataire = (appartementId: string, appartementNumero: string) => {
+  const handleAjouterLocataire = (
+    appartementId: string,
+    appartementNumero: string
+  ) => {
     const params = new URLSearchParams({
       appartementId: appartementId,
       immeubleId: immeuble.id,
       appartementNumero: appartementNumero,
       immeubleNom: immeuble.nom,
-      retour: 'immeuble'
+      retour: "immeuble",
     });
-    
+
     // 🔥 CORRECTION : Utiliser le bon chemin /dashboard/locataires/add
     router.push(`/dashboard/locataires/add?${params.toString()}`);
   };
@@ -63,16 +100,22 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
   // 🔥 NOUVELLE FONCTION : Naviguer vers les détails du locataire
   const handleVoirLocataire = (locataireId: string) => {
     const params = new URLSearchParams({
-      retour: 'immeuble',
-      immeubleId: immeuble.id
+      retour: "immeuble",
+      immeubleId: immeuble.id,
     });
-    
+
     // 🔥 CORRECTION : Utiliser le bon chemin /dashboard/locataires/details/[id]
-    router.push(`/dashboard/locataires/details/${locataireId}?${params.toString()}`);
+    router.push(
+      `/dashboard/locataires/details/${locataireId}?${params.toString()}`
+    );
   };
 
-  const appartementLibres = immeuble.appartements.filter(apt => apt.statut === 'libre').length;
-  const appartementOccupes = immeuble.appartements.filter(apt => apt.statut === 'occupe').length;
+  const appartementLibres = immeuble.appartements.filter(
+    (apt) => apt.statut === "libre"
+  ).length;
+  const appartementOccupes = immeuble.appartements.filter(
+    (apt) => apt.statut === "occupe"
+  ).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -81,8 +124,8 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={onBack}
                 className="border-gray-200 hover:bg-gray-50 transition-colors"
               >
@@ -90,15 +133,17 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                 Retour
               </Button>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{immeuble.nom}</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {immeuble.nom}
+                </h1>
                 <p className="text-gray-600 flex items-center">
                   <Building2 size={16} className="mr-2" />
                   Détails et gestion des appartements
                 </p>
               </div>
             </div>
-            <Button 
-              onClick={onEdit} 
+            <Button
+              onClick={onEdit}
               className="bg-blue-600 hover:bg-blue-700 shadow-sm transition-all duration-200"
             >
               <Edit size={18} className="mr-2" />
@@ -113,8 +158,12 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Total appartements</p>
-                  <p className="text-3xl font-bold text-gray-900">{immeuble.nombreAppartements}</p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Total appartements
+                  </p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {immeuble.nombreAppartements}
+                  </p>
                 </div>
                 <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center">
                   <Building2 className="h-6 w-6 text-blue-600" />
@@ -127,8 +176,12 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Occupés</p>
-                  <p className="text-3xl font-bold text-emerald-600">{appartementOccupes}</p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Occupés
+                  </p>
+                  <p className="text-3xl font-bold text-emerald-600">
+                    {appartementOccupes}
+                  </p>
                 </div>
                 <div className="h-12 w-12 bg-emerald-100 rounded-xl flex items-center justify-center">
                   <UserCheck className="h-6 w-6 text-emerald-600" />
@@ -141,8 +194,12 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Libres</p>
-                  <p className="text-3xl font-bold text-red-500">{appartementLibres}</p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Libres
+                  </p>
+                  <p className="text-3xl font-bold text-red-500">
+                    {appartementLibres}
+                  </p>
                 </div>
                 <div className="h-12 w-12 bg-red-100 rounded-xl flex items-center justify-center">
                   <UserX className="h-6 w-6 text-red-500" />
@@ -155,9 +212,17 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Taux d'occupation</p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Taux d'occupation
+                  </p>
                   <p className="text-3xl font-bold text-blue-600">
-                    {immeuble.nombreAppartements > 0 ? Math.round((appartementOccupes / immeuble.nombreAppartements) * 100) : 0}%
+                    {immeuble.nombreAppartements > 0
+                      ? Math.round(
+                          (appartementOccupes / immeuble.nombreAppartements) *
+                            100
+                        )
+                      : 0}
+                    %
                   </p>
                 </div>
                 <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -173,19 +238,19 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="border-b border-gray-100">
               <TabsList className="grid w-full grid-cols-3 bg-transparent h-auto p-0">
-                <TabsTrigger 
-                  value="infos" 
+                <TabsTrigger
+                  value="infos"
                   className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none py-4 font-medium"
                 >
                   Informations
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="appartements"
                   className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none py-4 font-medium"
                 >
                   Appartements
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="historique"
                   className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none py-4 font-medium"
                 >
@@ -213,16 +278,28 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                       </Badge>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="font-medium text-gray-700">Nombre d'appartements :</span>
-                      <span className="font-semibold text-gray-900">{immeuble.nombreAppartements}</span>
+                      <span className="font-medium text-gray-700">
+                        Nombre d'appartements :
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {immeuble.nombreAppartements}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="font-medium text-gray-700">Date de création :</span>
-                      <span className="text-gray-600">{formatDate(immeuble.createdAt)}</span>
+                      <span className="font-medium text-gray-700">
+                        Date de création :
+                      </span>
+                      <span className="text-gray-600">
+                        {formatDate(immeuble.createdAt)}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="font-medium text-gray-700">Dernière modification :</span>
-                      <span className="text-gray-600">{formatDate(immeuble.updatedAt)}</span>
+                      <span className="font-medium text-gray-700">
+                        Dernière modification :
+                      </span>
+                      <span className="text-gray-600">
+                        {formatDate(immeuble.updatedAt)}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -238,15 +315,25 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                   <CardContent className="space-y-4">
                     <div className="flex justify-between items-center py-2">
                       <span className="font-medium text-gray-700">Ville :</span>
-                      <span className="font-semibold text-gray-900">{immeuble.ville}</span>
+                      <span className="font-semibold text-gray-900">
+                        {immeuble.ville}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="font-medium text-gray-700">Quartier :</span>
-                      <span className="font-semibold text-gray-900">{immeuble.quartier}</span>
+                      <span className="font-medium text-gray-700">
+                        Quartier :
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {immeuble.quartier}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="font-medium text-gray-700">Secteur :</span>
-                      <span className="font-semibold text-gray-900">{immeuble.secteur}</span>
+                      <span className="font-medium text-gray-700">
+                        Secteur :
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {immeuble.secteur}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -266,19 +353,24 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                       <div className="flex items-center">
                         <User size={16} className="mr-3 text-gray-500" />
                         <span className="font-semibold text-gray-900">
-                          {immeuble.proprietaireActuel.prenom} {immeuble.proprietaireActuel.nom}
+                          {immeuble.proprietaireActuel.prenom}{" "}
+                          {immeuble.proprietaireActuel.nom}
                         </span>
                       </div>
                       {immeuble.proprietaireActuel.email && (
                         <div className="flex items-center">
                           <Mail size={16} className="mr-3 text-gray-500" />
-                          <span className="text-gray-700">{immeuble.proprietaireActuel.email}</span>
+                          <span className="text-gray-700">
+                            {immeuble.proprietaireActuel.email}
+                          </span>
                         </div>
                       )}
                       {immeuble.proprietaireActuel.telephone && (
                         <div className="flex items-center">
                           <Phone size={16} className="mr-3 text-gray-500" />
-                          <span className="text-gray-700">{immeuble.proprietaireActuel.telephone}</span>
+                          <span className="text-gray-700">
+                            {immeuble.proprietaireActuel.telephone}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -286,7 +378,8 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                       <div className="flex items-center">
                         <Calendar size={16} className="mr-3 text-gray-500" />
                         <span className="text-gray-700">
-                          Propriétaire depuis le {formatDate(immeuble.proprietaireActuel.dateDebut)}
+                          Propriétaire depuis le{" "}
+                          {formatDate(immeuble.proprietaireActuel.dateDebut)}
                         </span>
                       </div>
                     </div>
@@ -299,7 +392,10 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
             <TabsContent value="appartements" className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {immeuble.appartements.map((appartement) => (
-                  <Card key={appartement.id} className="border border-gray-100 hover:shadow-md transition-all duration-200">
+                  <Card
+                    key={appartement.id}
+                    className="border border-gray-100 hover:shadow-md transition-all duration-200"
+                  >
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-center">
                         <CardTitle className="text-lg flex items-center text-gray-900">
@@ -314,12 +410,17 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                         <div className="space-y-3">
                           {/* 🔥 NOM CLIQUABLE pour voir les détails */}
                           <button
-                            onClick={() => handleVoirLocataire(appartement.locataireActuel!.id)}
+                            onClick={() =>
+                              handleVoirLocataire(
+                                appartement.locataireActuel.id
+                              )
+                            }
                             className="font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors text-left"
                           >
-                            {appartement.locataireActuel.prenom} {appartement.locataireActuel.nom}
+                            {appartement.locataireActuel.prenom}{" "}
+                            {appartement.locataireActuel.nom}
                           </button>
-                          
+
                           {appartement.locataireActuel.email && (
                             <p className="text-sm text-gray-600 flex items-center">
                               <Mail size={14} className="mr-2" />
@@ -334,28 +435,58 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                           )}
                           <p className="text-sm text-gray-500 flex items-center">
                             <Calendar size={14} className="mr-2" />
-                            Depuis le {formatDate(appartement.locataireActuel.dateEntree)}
+                            Depuis le{" "}
+                            {formatDate(appartement.locataireActuel.dateEntree)}
                           </p>
+
+                          {/* Bouton Marquer sortie */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50 mt-2"
+                            disabled={loading}
+                            onClick={async () => {
+                              await marquerSortie(
+                                appartement.locataireActuel.id
+                              );
+                              onRefresh();
+                            }}
+                          >
+                            Marquer sortie
+                          </Button>
                         </div>
                       ) : (
                         <div className="text-center text-gray-500 py-6">
-                          <Home size={32} className="mx-auto mb-3 text-gray-300" />
+                          <Home
+                            size={32}
+                            className="mx-auto mb-3 text-gray-300"
+                          />
                           <p className="mb-3">Appartement libre</p>
-                          {/* 🔥 BOUTON MODIFIÉ AVEC NAVIGATION */}
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             className="bg-blue-600 hover:bg-blue-700"
-                            onClick={() => handleAjouterLocataire(appartement.id, appartement.numero)}
+                            onClick={() =>
+                              handleAjouterLocataire(
+                                appartement.id,
+                                appartement.numero
+                              )
+                            }
                           >
                             Ajouter locataire
                           </Button>
                         </div>
                       )}
-                      
                       {appartement.historiqueLocataires.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-gray-100">
                           <p className="text-xs text-gray-500">
-                            {appartement.historiqueLocataires.length} ancien{appartement.historiqueLocataires.length > 1 ? 's' : ''} locataire{appartement.historiqueLocataires.length > 1 ? 's' : ''}
+                            {appartement.historiqueLocataires.length} ancien
+                            {appartement.historiqueLocataires.length > 1
+                              ? "s"
+                              : ""}{" "}
+                            locataire
+                            {appartement.historiqueLocataires.length > 1
+                              ? "s"
+                              : ""}
                           </p>
                         </div>
                       )}
@@ -376,26 +507,43 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                 </CardHeader>
                 <CardContent>
                   {immeuble.historiqueProprietaires.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">Aucun historique de propriétaire</p>
+                    <p className="text-gray-500 text-center py-8">
+                      Aucun historique de propriétaire
+                    </p>
                   ) : (
                     <div className="space-y-4">
-                      {immeuble.historiqueProprietaires.map((proprietaire, index) => (
-                        <div key={proprietaire.id} className="border-l-4 border-blue-200 pl-6 py-3 bg-blue-50/30 rounded-r-lg">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-semibold text-gray-900">
-                                {proprietaire.prenom} {proprietaire.nom}
-                              </p>
-                              {proprietaire.email && <p className="text-sm text-gray-600 mt-1">{proprietaire.email}</p>}
-                              {proprietaire.telephone && <p className="text-sm text-gray-600">{proprietaire.telephone}</p>}
-                            </div>
-                            <div className="text-right text-sm text-gray-500">
-                              <p>Du {formatDate(proprietaire.dateDebut)}</p>
-                              {proprietaire.dateFin && <p>Au {formatDate(proprietaire.dateFin)}</p>}
+                      {immeuble.historiqueProprietaires.map(
+                        (proprietaire, index) => (
+                          <div
+                            key={proprietaire.id}
+                            className="border-l-4 border-blue-200 pl-6 py-3 bg-blue-50/30 rounded-r-lg"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold text-gray-900">
+                                  {proprietaire.prenom} {proprietaire.nom}
+                                </p>
+                                {proprietaire.email && (
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {proprietaire.email}
+                                  </p>
+                                )}
+                                {proprietaire.telephone && (
+                                  <p className="text-sm text-gray-600">
+                                    {proprietaire.telephone}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right text-sm text-gray-500">
+                                <p>Du {formatDate(proprietaire.dateDebut)}</p>
+                                {proprietaire.dateFin && (
+                                  <p>Au {formatDate(proprietaire.dateFin)}</p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -409,40 +557,70 @@ export function BuildingDetail({ immeuble, onBack, onEdit }: BuildingDetailProps
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {immeuble.appartements.every(apt => apt.historiqueLocataires.length === 0) ? (
-                    <p className="text-gray-500 text-center py-8">Aucun historique de locataire</p>
+                  {immeuble.appartements.every(
+                    (apt) => apt.historiqueLocataires.length === 0
+                  ) ? (
+                    <p className="text-gray-500 text-center py-8">
+                      Aucun historique de locataire
+                    </p>
                   ) : (
                     <div className="space-y-6">
-                      {immeuble.appartements.map((appartement) => (
-                        appartement.historiqueLocataires.length > 0 && (
-                          <div key={appartement.id}>
-                            <h4 className="font-semibold text-blue-700 mb-4">Appartement {appartement.numero}</h4>
-                            <div className="space-y-3">
-                              {appartement.historiqueLocataires.map((locataire, index) => (
-                                <div key={locataire.id} className="border-l-4 border-gray-200 pl-6 py-3 bg-gray-50/50 rounded-r-lg">
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      {/* 🔥 HISTORIQUE AUSSI CLIQUABLE */}
-                                      <button
-                                        onClick={() => handleVoirLocataire(locataire.id)}
-                                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors text-left"
-                                      >
-                                        {locataire.prenom} {locataire.nom}
-                                      </button>
-                                      {locataire.email && <p className="text-sm text-gray-600 mt-1">{locataire.email}</p>}
-                                      {locataire.telephone && <p className="text-sm text-gray-600">{locataire.telephone}</p>}
+                      {immeuble.appartements.map(
+                        (appartement) =>
+                          appartement.historiqueLocataires.length > 0 && (
+                            <div key={appartement.id}>
+                              <h4 className="font-semibold text-blue-700 mb-4">
+                                Appartement {appartement.numero}
+                              </h4>
+                              <div className="space-y-3">
+                                {appartement.historiqueLocataires.map(
+                                  (locataire, index) => (
+                                    <div
+                                      key={locataire.id}
+                                      className="border-l-4 border-gray-200 pl-6 py-3 bg-gray-50/50 rounded-r-lg"
+                                    >
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          {/* 🔥 HISTORIQUE AUSSI CLIQUABLE */}
+                                          <button
+                                            onClick={() =>
+                                              handleVoirLocataire(locataire.id)
+                                            }
+                                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors text-left"
+                                          >
+                                            {locataire.prenom} {locataire.nom}
+                                          </button>
+                                          {locataire.email && (
+                                            <p className="text-sm text-gray-600 mt-1">
+                                              {locataire.email}
+                                            </p>
+                                          )}
+                                          {locataire.telephone && (
+                                            <p className="text-sm text-gray-600">
+                                              {locataire.telephone}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="text-right text-sm text-gray-500">
+                                          <p>
+                                            Du{" "}
+                                            {formatDate(locataire.dateEntree)}
+                                          </p>
+                                          {locataire.dateSortie && (
+                                            <p>
+                                              Au{" "}
+                                              {formatDate(locataire.dateSortie)}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                    <div className="text-right text-sm text-gray-500">
-                                      <p>Du {formatDate(locataire.dateEntree)}</p>
-                                      {locataire.dateSortie && <p>Au {formatDate(locataire.dateSortie)}</p>}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
+                                  )
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )
-                      ))}
+                          )
+                      )}
                     </div>
                   )}
                 </CardContent>

@@ -1,13 +1,14 @@
-// src/hooks/useLocataires.ts
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-// Test temporaire - change selon où est ton fichier service
-// Si le service est dans src/services/
-// OU si le service est dans src/app/services/
-// import { LocataireService } from '@/app/services/locatairesService';
-// ✅ CORRECTION : Import depuis le bon fichier locataire.ts
 import { Locataire, LocataireFilters, LocataireFormData } from '@/app/types/locataires';
-import { LocataireService } from '@/app/services/locatairesService';
+import {
+  createLocataire,
+  getLocataires,
+  getLocataireById,
+  updateLocataire,
+  marquerSortieLocataire,
+  deleteLocataire
+} from '@/app/services/locatairesService';
 
 export const useLocataires = () => {
   const { user } = useAuth();
@@ -22,34 +23,20 @@ export const useLocataires = () => {
       return;
     }
 
-    let unsubscribe: (() => void) | undefined;
+    setLoading(true);
+    setError(null);
 
-    const chargerLocataires = () => {
-      try {
-        // Utiliser l'écoute en temps réel
-        unsubscribe = LocataireService.ecouterLocataires(
-          user.uid,
-          (locatairesData: Locataire[]) => {
-            setLocataires(locatairesData);
-            setLoading(false);
-            setError(null);
-          }
-        );
-      } catch (err) {
+    getLocataires(user.uid)
+      .then((locatairesData) => {
+        setLocataires(locatairesData);
+        setLoading(false);
+        setError(null);
+      })
+      .catch((err) => {
         console.error('Erreur lors du chargement des locataires:', err);
         setError('Erreur lors du chargement des locataires');
         setLoading(false);
-      }
-    };
-
-    chargerLocataires();
-
-    // Nettoyer l'abonnement au démontage
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
+      });
   }, [user?.uid]);
 
   // Créer un nouveau locataire
@@ -60,9 +47,9 @@ export const useLocataires = () => {
 
     setLoading(true);
     setError(null);
-    
+
     try {
-      const id = await LocataireService.creerLocataire(data, user.uid);
+      const id = await createLocataire(data, user.uid);
       return id;
     } catch (err) {
       const message = 'Erreur lors de la création du locataire';
@@ -74,12 +61,12 @@ export const useLocataires = () => {
   }, [user?.uid]);
 
   // Modifier un locataire
-  const modifierLocataire = useCallback(async (id: string, data: Partial<LocataireFormData>) => {
+  const modifierLocataire = useCallback(async (id: string, data: Partial<LocataireFormData>, ancienAppartementId?: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      await LocataireService.modifierLocataire(id, data);
+      await updateLocataire(id, data, ancienAppartementId);
     } catch (err) {
       const message = 'Erreur lors de la modification du locataire';
       setError(message);
@@ -90,12 +77,12 @@ export const useLocataires = () => {
   }, []);
 
   // Marquer la sortie d'un locataire
-  const marquerSortie = useCallback(async (id: string, dateSortie: Date) => {
+  const marquerSortie = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      await LocataireService.marquerSortie(id, dateSortie);
+      await marquerSortieLocataire(id);
     } catch (err) {
       const message = 'Erreur lors de la sortie du locataire';
       setError(message);
@@ -109,9 +96,9 @@ export const useLocataires = () => {
   const supprimerLocataire = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      await LocataireService.supprimerLocataire(id);
+      await deleteLocataire(id);
     } catch (err) {
       const message = 'Erreur lors de la suppression du locataire';
       setError(message);
@@ -124,9 +111,9 @@ export const useLocataires = () => {
   // Récupérer un locataire spécifique
   const obtenirLocataire = useCallback(async (id: string) => {
     setError(null);
-    
+
     try {
-      return await LocataireService.obtenirLocataire(id);
+      return await getLocataireById(id);
     } catch (err) {
       const message = 'Erreur lors de la récupération du locataire';
       setError(message);
@@ -162,7 +149,7 @@ export const useLocataires = () => {
   const statistiques = useCallback(() => {
     const actifs = locataires.filter(l => !l.dateSortie);
     const sortis = locataires.filter(l => l.dateSortie);
-    
+
     return {
       totalActifs: actifs.length,
       totalSortis: sortis.length,
@@ -175,14 +162,14 @@ export const useLocataires = () => {
     locataires,
     loading,
     error,
-    
+
     // Actions
     creerLocataire,
     modifierLocataire,
     marquerSortie,
     supprimerLocataire,
     obtenirLocataire,
-    
+
     // Utilitaires
     filtrerLocataires,
     statistiques,

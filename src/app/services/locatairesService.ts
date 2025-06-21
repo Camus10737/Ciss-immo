@@ -238,21 +238,19 @@ export const updateLocataire = async (
 // Marquer la sortie d'un locataire
 export const marquerSortieLocataire = async (id: string): Promise<void> => {
   try {
-    // Récupérer les infos du locataire avant la sortie
     const locataire = await getLocataireById(id);
-    if (!locataire) {
-      throw new Error('Locataire introuvable');
-    }
-    
+    if (!locataire) throw new Error('Locataire introuvable');
+
+    // Met à jour la date de sortie du locataire
     const docRef = doc(db, COLLECTION_NAME, id);
     await updateDoc(docRef, {
       dateSortie: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
-    
-    // 🔥 NOUVEAU : Libérer l'appartement
+
+    // Libère l'appartement immédiatement
     await synchronisationService.libererAppartement(locataire.appartementId, id);
-    
+
   } catch (error) {
     console.error('Erreur lors du marquage de sortie:', error);
     throw error;

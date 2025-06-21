@@ -3,7 +3,10 @@ import { cloudinaryService } from "@/app/services/cloudinaryService";
 
 export async function POST(req: NextRequest) {
   try {
+<<<<<<< HEAD
     
+=======
+>>>>>>> origin/Moussa
     const formData = await req.formData();
     const file = formData.get("file") as File;
     if (!file) {
