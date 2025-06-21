@@ -7,13 +7,22 @@ import { Button } from "@/components/ui/button";
 import { Calculator, TrendingUp, Receipt, FileBarChart2, DollarSign } from "lucide-react";
 import { DepotRecuForm } from "./components/DepotRecuForm";
 import { ValidationRecusAdmin } from "./components/ValidationRecusAdmin";
+import { DepensesList } from "./components/DepensesList";
+import { AjoutDepenseForm } from "./components/AjoutDepenseForm";
 
-export function ComptabiliteDetail({ appartementId, isAdmin }) {
+export function ComptabiliteDetail({ }) {
   const [activeTab, setActiveTab] = useState("revenus");
   const { locataires, loading } = useLocataires();
+  const [showDepenseForm, setShowDepenseForm] = useState(false);
+  const [depenses, setDepenses] = useState<any[]>([]);
 
   // Filtrer les locataires actuels (pas de dateSortie)
   const locatairesActuels = (locataires || []).filter(l => !l.dateSortie);
+
+  // Ajout d'une dépense (tu peux remplacer ce stockage local par un enregistrement en base)
+  const handleSaveDepense = (depense: any) => {
+    setDepenses(prev => [...prev, depense]);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -114,12 +123,19 @@ export function ComptabiliteDetail({ appartementId, isAdmin }) {
               <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 size="sm"
+                onClick={() => setShowDepenseForm(true)}
               >
                 Ajouter une dépense
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="text-gray-500">Aucune dépense enregistrée.</div>
+              {showDepenseForm && (
+                <AjoutDepenseForm
+                  onSave={handleSaveDepense}
+                  onClose={() => setShowDepenseForm(false)}
+                />
+              )}
+              <DepensesList depenses={depenses} />
             </CardContent>
           </Card>
         )}

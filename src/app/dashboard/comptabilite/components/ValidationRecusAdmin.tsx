@@ -14,14 +14,18 @@ export function ValidationRecusAdmin() {
   const [locataireNames, setLocataireNames] = useState<Record<string, string>>(
     {}
   );
+  const [validationModal, setValidationModal] = useState<RecuPaiement | null>(
+    null
+  );
+  const [montant, setMontant] = useState<number>(0);
+  const [mois, setMois] = useState<number>(1);
+  const [description, setDescription] = useState<string>("");
 
-  // Récupère les reçus et les noms des locataires
   const fetchRecus = async () => {
     setLoading(true);
     const data = await recuService.getRecusEnAttente();
     setRecus(data);
 
-    // Récupérer les noms des locataires pour tous les reçus
     const names: Record<string, string> = {};
     for (const recu of data) {
       if (!names[recu.locataireId]) {
@@ -44,13 +48,52 @@ export function ValidationRecusAdmin() {
     // eslint-disable-next-line
   }, []);
 
-  const handleValidation = async (id: string, valider: boolean) => {
+  // Ouvre la modale de validation et pré-remplit les champs
+  const openValidationModal = (recu: RecuPaiement) => {
+    setValidationModal(recu);
+    setMontant(0);
+    setMois(recu.moisPayes);
+    setDescription("");
+  };
+
+  // Validation avec contrôle du nombre de mois
+  const handleValidation = async () => {
+    if (!validationModal) return;
     setLoading(true);
-    if (valider) {
-      await recuService.validerRecu(id);
+
+    if (mois === validationModal.moisPayes) {
+      // Nombre de mois inchangé, simple validation
+      await recuService.validerRecu(
+        validationModal.id,
+        description,
+        montant,
+        mois
+      );
     } else {
-      await recuService.refuserRecu(id, "Reçu refusé par l'administrateur.");
+      // Nombre de mois modifié, on met à jour le reçu
+      await recuService.updateRecuMois(
+        validationModal.id,
+        mois,
+        description,
+        montant
+      );
+      await recuService.validerRecu(
+        validationModal.id,
+        description,
+        montant,
+        mois
+      );
     }
+
+    setValidationModal(null);
+    await fetchRecus();
+    setLoading(false);
+  };
+
+  // Refus classique
+  const handleRefus = async (id: string) => {
+    setLoading(true);
+    await recuService.refuserRecu(id, "Reçu refusé par l'administrateur.");
     await fetchRecus();
     setLoading(false);
   };
@@ -83,7 +126,7 @@ export function ValidationRecusAdmin() {
                   Voir
                 </Button>
                 <Button
-                  onClick={() => handleValidation(recu.id, true)}
+                  onClick={() => openValidationModal(recu)}
                   className="bg-green-600 hover:bg-green-700 text-white"
                   title="Valider"
                 >
@@ -91,7 +134,7 @@ export function ValidationRecusAdmin() {
                   Valider
                 </Button>
                 <Button
-                  onClick={() => handleValidation(recu.id, false)}
+                  onClick={() => handleRefus(recu.id)}
                   className="bg-red-600 hover:bg-red-700 text-white"
                   title="Refuser"
                 >
@@ -123,6 +166,71 @@ export function ValidationRecusAdmin() {
                 allow="autoplay"
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de validation */}
+      {validationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={() => setValidationModal(null)}
+            >
+              ✕
+            </button>
+            <div className="mb-4 font-semibold text-lg">Validation du reçu</div>
+            <div className="space-y-3">
+              <div>
+                <label className="block font-medium">Montant payé</label>
+                <input
+                  type="text"
+                  value={montant}
+                  onChange={(e) => {
+                    // Autorise uniquement chiffres et éventuellement un point ou une virgule
+                    const val = e.target.value.replace(/[^0-9.,]/g, "");
+                    setMontant(val);
+                  }}
+                  className="border rounded px-2 py-1 w-full"
+                  placeholder="Ex: 500"
+                  required
+                  inputMode="decimal"
+                  pattern="^\d+([.,]\d{1,2})?$"
+                />
+              </div>
+              <div>
+                <label className="block font-medium">
+                  Nombre de mois payés
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={mois}
+                  onChange={(e) => setMois(Number(e.target.value))}
+                  className="border rounded px-2 py-1 w-full"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-medium">Description / Note</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="border rounded px-2 py-1 w-full"
+                  rows={2}
+                  placeholder="Ajouter une note ou un détail (optionnel)"
+                />
+              </div>
+              <Button
+                onClick={handleValidation}
+                className="bg-green-600 hover:bg-green-700 text-white w-full"
+                disabled={loading}
+              >
+                Valider le reçu
+              </Button>
+            </div>
           </div>
         </div>
       )}

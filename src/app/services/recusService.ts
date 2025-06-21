@@ -5,7 +5,6 @@ import { RecuPaiement } from "@/app/types/recus";
 const COLLECTION_NAME = "recus";
 
 export const recuService = {
-  // Modifié : fichierUrl est une string (URL Cloudinary)
   async creerRecu(
     locataireId: string,
     appartementId: string,
@@ -34,10 +33,33 @@ export const recuService = {
     })) as RecuPaiement[];
   },
 
-  async validerRecu(id: string, commentaire?: string) {
+  // Nouvelle méthode pour mettre à jour le nombre de mois, montant et description AVANT validation
+  async updateRecuMois(
+    id: string,
+    moisPayes: number,
+    description?: string,
+    montant?: number
+  ) {
+    await updateDoc(doc(db, COLLECTION_NAME, id), {
+      moisPayes,
+      montant: montant ?? null,
+      description: description || "",
+      updatedAt: Timestamp.now(),
+    });
+  },
+
+  // Modifié : accepte montant, nombre de mois et commentaire lors de la validation
+  async validerRecu(
+    id: string,
+    commentaire?: string,
+    montant?: number,
+    moisPayes?: number
+  ) {
     await updateDoc(doc(db, COLLECTION_NAME, id), {
       statut: "valide",
       commentaire: commentaire || "",
+      montant: montant ?? null,
+      moisPayes: moisPayes ?? null,
       updatedAt: Timestamp.now(),
     });
   },
@@ -49,4 +71,16 @@ export const recuService = {
       updatedAt: Timestamp.now(),
     });
   },
+
+  async getRecusValides(): Promise<RecuPaiement[]> {
+  const q = query(collection(db, COLLECTION_NAME), where("statut", "==", "valide"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+    createdAt: docSnap.data().createdAt?.toDate(),
+    updatedAt: docSnap.data().updatedAt?.toDate(),
+  })) as RecuPaiement[];
+},
 };
+
