@@ -47,6 +47,7 @@ export interface Immeuble {
   proprietaireActuel: Proprietaire;
   historiqueProprietaires: Proprietaire[];
   appartements: Appartement[];
+  gestionnaireId?: string; 
   createdAt: Date;
   updatedAt: Date;
 }

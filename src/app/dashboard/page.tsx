@@ -1,6 +1,9 @@
+// src/app/dashboard/page.tsx
+// Remplace SEULEMENT la partie import et header, garde le reste de ton code !
+
 "use client";
 
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -12,24 +15,24 @@ import {
   BarChart3,
   LogOut,
   User,
+  Shield,
 } from "lucide-react";
 import { BuildingList } from "./immeubles/buildingList";
 import TenantList from "./locataires/components/tenantList";
-import { DepotRecuForm } from "@/app/dashboard/comptabilite/components/DepotRecuForm";
-import { ValidationRecusAdmin } from "@/app/dashboard/comptabilite/components/ValidationRecusAdmin";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ComptabiliteDetail } from "@/app/dashboard/comptabilite/ComptabiliteDetail";
 import { getLocataires } from "@/app/services/locatairesService";
+import { AdminSection } from "./administrateur/components/AdminSection";
+// 🆕 AJOUTE CET IMPORT
+import { ProfileNavbarLinkWithAvatar } from "./profile/components/ProfileNavbarLink";
 
-type Section = "immeubles" | "locataires" | "comptabilite" | "statistiques";
+type Section = "immeubles" | "locataires" | "comptabilite" | "statistiques" | "administrateur";
 
 export default function DashboardPage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, isAdmin } = useAuthWithRole();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<Section>("immeubles");
   const [appartementId, setAppartementId] = useState<string | null>(null);
-
 
   useEffect(() => {
     const fetchLocataireActuel = async () => {
@@ -42,17 +45,17 @@ export default function DashboardPage() {
     fetchLocataireActuel();
   }, [user?.uid]);
 
-  // Redirection si pas connecté
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
     }
   }, [user, loading, router]);
+
   useEffect(() => {
     const section = searchParams.get("section");
     if (
       section &&
-      ["immeubles", "locataires", "comptabilite", "statistiques"].includes(
+      ["immeubles", "locataires", "comptabilite", "statistiques", "administrateur"].includes(
         section
       )
     ) {
@@ -67,7 +70,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Affichage de chargement
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
@@ -100,55 +102,61 @@ export default function DashboardPage() {
     );
   }
 
-  // Si pas d'utilisateur (pendant la redirection)
   if (!user) {
     return null;
   }
 
-  const menuItems = [
+  const baseMenuItems = [
     {
       id: "immeubles" as Section,
       label: "Immeubles",
       icon: Building2,
       description: "Gérez vos biens immobiliers",
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE"],
     },
     {
       id: "locataires" as Section,
       label: "Locataires",
       icon: Users,
       description: "Gestion des locataires",
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE"],
     },
     {
       id: "comptabilite" as Section,
       label: "Comptabilité",
       icon: Calculator,
       description: "Revenus et dépenses",
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE", "LOCATAIRE"],
     },
     {
       id: "statistiques" as Section,
       label: "Statistiques",
       icon: BarChart3,
       description: "Analyses et rapports",
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE"],
+    },
+    {
+      id: "administrateur" as Section,
+      label: "Administrateur",
+      icon: Shield,
+      description: "Gestion des utilisateurs",
+      roles: ["SUPER_ADMIN"],
     },
   ];
+
+  const userRole = user?.role || 'GESTIONNAIRE';
+  const menuItems = baseMenuItems.filter(item => 
+    item.roles.includes(userRole)
+  );
 
   const renderSectionContent = () => {
     switch (activeSection) {
       case "immeubles":
         return <BuildingList />;
-
       case "locataires":
         return <TenantList />;
-
-     
       case "comptabilite":
-        return (
-          <ComptabiliteDetail
-            locataireId={user?.uid}
-            appartementId={appartementId}
-            isAdmin={user?.role === "admin"}            />
-         );
-
+        return <ComptabiliteDetail />;
       case "statistiques":
         return (
           <Card className="bg-white border-0 shadow-sm">
@@ -189,7 +197,25 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         );
-
+      case "administrateur":
+        if (userRole !== "SUPER_ADMIN") {
+          return (
+            <Card className="bg-white border-0 shadow-sm">
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <Shield size={48} className="mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Accès non autorisé
+                  </h3>
+                  <p className="text-gray-600">
+                    Seuls les super administrateurs peuvent accéder à cette section.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
+        return <AdminSection />;
       default:
         return null;
     }
@@ -211,12 +237,18 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3 text-gray-700 bg-gray-50 rounded-lg px-3 py-2">
-                <User size={18} className="text-blue-600" />
-                <span className="hidden sm:block font-medium">
-                  {user.email}
-                </span>
+              {/* 🆕 REMPLACE CETTE PARTIE */}
+              <div className="flex items-center space-x-3">
+                <ProfileNavbarLinkWithAvatar />
+                {/* Badge de rôle */}
+                {isAdmin() && (
+                  <span className="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs font-medium rounded-full">
+                    Admin
+                  </span>
+                )}
               </div>
+              {/* FIN DE LA PARTIE REMPLACÉE */}
+              
               <Button
                 onClick={handleLogout}
                 variant="outline"
@@ -245,7 +277,9 @@ export default function DashboardPage() {
                   onClick={() => setActiveSection(item.id)}
                   className={`flex items-center space-x-3 px-6 py-3 rounded-xl transition-all duration-200 whitespace-nowrap min-w-fit ${
                     isActive
-                      ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
+                      ? item.id === "administrateur"
+                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                        : "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
                       : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                   }`}
                 >
@@ -257,7 +291,11 @@ export default function DashboardPage() {
                     <div className="font-medium">{item.label}</div>
                     <div
                       className={`text-xs ${
-                        isActive ? "text-blue-100" : "text-gray-500"
+                        isActive 
+                          ? item.id === "administrateur" 
+                            ? "text-indigo-100" 
+                            : "text-blue-100"
+                          : "text-gray-500"
                       }`}
                     >
                       {item.description}

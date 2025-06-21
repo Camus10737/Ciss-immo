@@ -123,18 +123,12 @@ export function ComptabiliteDetail({ }) {
               <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 size="sm"
-<<<<<<< HEAD
-=======
                 onClick={() => setShowDepenseForm(true)}
->>>>>>> origin/Moussa
               >
                 Ajouter une dépense
               </Button>
             </CardHeader>
             <CardContent>
-<<<<<<< HEAD
-              <div className="text-gray-500">Aucune dépense enregistrée.</div>
-=======
               {showDepenseForm && (
                 <AjoutDepenseForm
                   onSave={handleSaveDepense}
@@ -142,7 +136,6 @@ export function ComptabiliteDetail({ }) {
                 />
               )}
               <DepensesList depenses={depenses} />
->>>>>>> origin/Moussa
             </CardContent>
           </Card>
         )}
