@@ -1,537 +1,358 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { recuService } from "@/app/services/recusService";
 import { depensesService } from "@/app/services/depensesService";
-import { getLocataireById } from "@/app/services/locatairesService";
+import { useLocataires } from "@/hooks/useLocataires";
 import { Button } from "@/components/ui/button";
-import { RecuPaiement } from "@/app/types/recus";
-import { Eye, CheckCircle2, XCircle } from "lucide-react";
+import { getRapportsAnnuels, saveRapportAnnuel } from "@/app/services/rapportService";
 
-// Utilitaire pour obtenir les mois déjà payés pour un client
-function getPaidMonthsForClient(clientId: string, operations: any[]) {
-  const paid: { [key: string]: boolean } = {};
-  operations
-    .filter((op) => op.client === clientId && op.type === "Ressource")
-    .forEach((op) => {
-      if (Array.isArray(op.moisArray)) {
-        op.moisArray.forEach(
-          (m: { year: number; month: number }) =>
-            (paid[`${m.year}-${m.month}`] = true)
-        );
-      } else if (Array.isArray(op.mois)) {
-        op.mois.forEach(
-          (m: number) => (paid[`${op.date.getFullYear()}-${m}`] = true)
-        );
-      } else if (typeof op.mois === "number") {
-        paid[`${op.date.getFullYear()}-${op.mois}`] = true;
-      }
-    });
-  return paid;
+function getMonthName(month: number) {
+  return [
+    "Janv", "Fév", "Mars", "Avr", "Mai", "Juin",
+    "Juil", "Août", "Sept", "Oct", "Nov", "Déc"
+  ][month];
 }
 
-// Trouve le dernier mois payé pour un client (retourne {year, month})
-function getLastPaidMonth(clientId: string, operations: any[]) {
-  let last = { year: 0, month: 0 };
-  operations
-    .filter((op) => op.client === clientId && op.type === "Ressource")
-    .forEach((op) => {
-      if (Array.isArray(op.moisArray)) {
-        op.moisArray.forEach((m: { year: number; month: number }) => {
-          if (
-            m.year > last.year ||
-            (m.year === last.year && m.month > last.month)
-          ) {
-            last = { year: m.year, month: m.month };
-          }
-        });
-      } else if (Array.isArray(op.mois)) {
-        op.mois.forEach((m: number) => {
-          const y = op.date.getFullYear();
-          if (y > last.year || (y === last.year && m > last.month)) {
-            last = { year: y, month: m };
-          }
-        });
-      } else if (typeof op.mois === "number") {
-        const y = op.date.getFullYear();
-        if (y > last.year || (y === last.year && op.mois > last.month)) {
-          last = { year: y, month: op.mois };
-        }
-      }
-    });
-  return last;
-}
+const TABS = [
+  { key: "synthese", label: "Synthèse" },
+  { key: "retards", label: "Retards de paiement" },
+];
 
 export function ValidationRecusAdmin() {
-  const [recus, setRecus] = useState<RecuPaiement[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [modalUrl, setModalUrl] = useState<string | null>(null);
-  const [locataireNames, setLocataireNames] = useState<Record<string, string>>(
-    {}
-  );
-  const [validationModal, setValidationModal] = useState<RecuPaiement | null>(
-    null
-  );
-  const [montant, setMontant] = useState<string>("");
-  const [mois, setMois] = useState<number>(1);
-  const [description, setDescription] = useState<string>("");
-  const [operations, setOperations] = useState<any[]>([]);
-  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-  const [duplicateOperation, setDuplicateOperation] = useState<any | null>(
-    null
-  );
-
-  // Pour la sélection des mois à valider
-  const [selectedMonths, setSelectedMonths] = useState<
-    { year: number; month: number }[]
-  >([]);
-
-  const fetchRecus = async () => {
-    setLoading(true);
-    const data = await recuService.getRecusEnAttente();
-    setRecus(data);
-
-    const names: Record<string, string> = {};
-    for (const recu of data) {
-      if (!names[recu.locataireId]) {
-        try {
-          const locataire = await getLocataireById(recu.locataireId);
-          names[recu.locataireId] = locataire
-            ? `${locataire.prenom} ${locataire.nom}`
-            : recu.locataireId;
-        } catch {
-          names[recu.locataireId] = recu.locataireId;
-        }
-      }
-    }
-    setLocataireNames(names);
-    setLoading(false);
-  };
-
-  const fetchOperations = async () => {
-    const recusValides = await recuService.getRecusValides();
-    const depenses = await depensesService.getDepenses?.();
-    setOperations([
-      ...recusValides.map((recu) => ({
-        type: "Ressource",
-        client: recu.locataireId,
-        montant: recu.montant,
-        mois: recu.moisPayes,
-        moisArray: recu.moisArray || recu.moisPayesArray || [],
-        date: recu.updatedAt ? new Date(recu.updatedAt) : new Date(),
-        description: recu.description || "",
-      })),
-      ...(depenses || []).map((dep) => ({
-        type: "Dépense",
-        client: dep.client,
-        montant: dep.montant,
-        mois: dep.mois,
-        date: dep.date ? new Date(dep.date) : new Date(),
-        description: dep.description || "",
-      })),
-    ]);
-  };
+  const [rapports, setRapports] = useState<any[]>([]);
+  const [showRapport, setShowRapport] = useState(false);
 
   useEffect(() => {
-    fetchRecus();
-    fetchOperations();
-    // eslint-disable-next-line
+    getRapportsAnnuels().then(setRapports);
   }, []);
 
-  // Ouvre la modale de validation et pré-remplit les champs
-  const openValidationModal = (recu: RecuPaiement) => {
-    setValidationModal(recu);
-    setMontant("");
-    setMois(recu.moisPayes);
-    setDescription("");
-    setSelectedMonths([]);
-  };
-
-  // Met à jour la sélection des mois si le nombre de mois change
-  useEffect(() => {
-    setSelectedMonths([]);
-  }, [mois, validationModal]);
-
-  // Génère la liste des mois sélectionnables à partir du dernier mois payé
-  function getSelectableMonths(clientId: string) {
-    const now = new Date();
-    const paidMonths = getPaidMonthsForClient(clientId, operations);
-    const lastPaid = getLastPaidMonth(clientId, operations);
-
-    // Commence à partir du mois suivant le dernier payé
-    let year = lastPaid.year || now.getFullYear();
-    let month = lastPaid.month || 0; // 0 = pas de mois payé, donc commence à janvier
-
-    // Si aucun mois payé, commence à ce mois-ci
-    if (!lastPaid.year && !lastPaid.month) {
-      year = now.getFullYear();
-      month = now.getMonth();
-    }
-
-    // Génère les 24 prochains mois (pour gérer les paiements en avance)
-    const months: { year: number; month: number }[] = [];
-    let count = 0;
-    let y = year;
-    let m = month;
-    while (count < 24) {
-      m++;
-      if (m > 12) {
-        m = 1;
-        y++;
-      }
-      months.push({ year: y, month: m });
-      count++;
-    }
-    return months;
-  }
-
-  // Validation avec contrôle du nombre de mois et doublon
-  const handleValidation = async (force = false) => {
-  if (!validationModal) return;
-
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1;
-
-  await fetchOperations(); // recharge la liste complète
-  const montantNumber = Number(montant);
-
-  const duplicateCandidates = operations.filter((op) => {
-    if (op.type !== "Ressource") return false;
-    if ((op.client || "").trim() !== validationModal.locataireId.trim()) return false;
-    if (Number(op.montant) !== montantNumber) return false;
-
-    const moisList: { year: number; month: number }[] = [];
-
-    if (Array.isArray(op.moisArray)) {
-      moisList.push(...op.moisArray);
-    } else if (Array.isArray(op.mois)) {
-      const y = new Date(op.date).getFullYear();
-      moisList.push(...op.mois.map((m: number) => ({ year: y, month: m })));
-    } else if (typeof op.mois === "number") {
-      const y = new Date(op.date).getFullYear();
-      moisList.push({ year: y, month: op.mois });
-    }
-
-    return moisList.some(
-      (m) => m.year === currentYear && m.month === currentMonth
-    );
-  });
-
-  const duplicate = duplicateCandidates
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-
-  if (duplicate && !force) {
-    setDuplicateOperation(duplicate);
-    setShowDuplicateModal(true);
-    return;
-  }
-
-  setLoading(true);
-
-  await recuService.validerRecu(
-    validationModal.id,
-    description,
-    montantNumber,
-    mois,
-    selectedMonths
-  );
-
-  setValidationModal(null);
-  await fetchRecus();
-  await fetchOperations();
-  setShowDuplicateModal(false);
-  setDuplicateOperation(null);
-  setLoading(false);
-};
-  // Refus classique
-  const handleRefus = async (id: string) => {
-    setLoading(true);
-    await recuService.refuserRecu(id, "Reçu refusé par l'administrateur.");
-    await fetchRecus();
-    setLoading(false);
-  };
-
-  // Prépare la nouvelle ligne proposée pour l'affichage dans la modale
-  const montantNumber = Number(montant);
-  const newOperation = validationModal && {
-    type: "Ressource",
-    client: validationModal.locataireId,
-    montant: montantNumber,
-    mois,
-    date: new Date(),
-    description,
+  // Pour rafraîchir la liste après ajout d'un rapport
+  const refreshRapports = () => {
+    getRapportsAnnuels().then(setRapports);
   };
 
   return (
     <div>
-      <h3 className="text-lg font-semibold mb-4">
-        Reçus en attente de validation
-      </h3>
-      {loading && <div>Chargement...</div>}
-      {recus.length === 0 && !loading && <div>Aucun reçu en attente.</div>}
-      <ul className="space-y-4">
-        {recus.map((recu) => (
-          <li key={recu.id} className="border rounded p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <b>Soumis par :</b>{" "}
-                {locataireNames[recu.locataireId] || recu.locataireId} <br />
-                <b>Appartement :</b> {recu.appartementId} <br />
-                <b>Mois payés :</b> {recu.moisPayes}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={() => setModalUrl(recu.fichierUrl)}
-                  title="Voir le reçu"
-                >
-                  <Eye size={16} className="mr-1" />
-                  Voir
-                </Button>
-                <Button
-                  onClick={() => openValidationModal(recu)}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  title="Valider"
-                >
-                  <CheckCircle2 size={16} className="mr-1" />
-                  Valider
-                </Button>
-                <Button
-                  onClick={() => handleRefus(recu.id)}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                  title="Refuser"
-                >
-                  <XCircle size={16} className="mr-1" />
-                  Refuser
-                </Button>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {/* Liste des rapports annuels sauvegardés */}
+      <div className="mb-8">
+        <h2 className="text-lg font-bold mb-2">Rapports annuels sauvegardés</h2>
+        <table className="min-w-full text-sm border">
+          <thead>
+            <tr>
+              <th className="border px-2 py-1">Année</th>
+              <th className="border px-2 py-1">Total ressources</th>
+              <th className="border px-2 py-1">Total dépenses</th>
+              <th className="border px-2 py-1">Bilan</th>
+              <th className="border px-2 py-1">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rapports.map((r) => (
+              <tr key={r.id}>
+                <td className="border px-2 py-1">{r.annee}</td>
+                <td className="border px-2 py-1">{r.totalRessources?.toLocaleString()} GNF</td>
+                <td className="border px-2 py-1">{r.totalDepenses?.toLocaleString()} GNF</td>
+                <td className="border px-2 py-1">{r.bilan?.toLocaleString()} GNF</td>
+                <td className="border px-2 py-1">{r.date ? new Date(r.date).toLocaleDateString() : ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-4">
+          <Button className="bg-blue-600 text-white" onClick={() => setShowRapport(true)}>
+            Générer un rapport annuel
+          </Button>
+        </div>
+      </div>
+      {/* Modale de génération de rapport */}
+      {showRapport && (
+        <RapportAnnuel
+          open={showRapport}
+          onClose={() => {
+            setShowRapport(false);
+            refreshRapports();
+          }}
+        />
+      )}
+      {/* ...le reste de ta logique de validation des reçus peut rester ici... */}
+    </div>
+  );
+}
 
-      {/* Fenêtre contextuelle (modal) pour afficher le reçu */}
-      {modalUrl && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4 max-w-2xl w-full relative">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-              onClick={() => setModalUrl(null)}
-            >
-              ✕
-            </button>
-            <div className="mb-4 font-semibold">Aperçu du reçu</div>
-            {modalUrl && (
-              <iframe
-                src={modalUrl}
-                className="w-full h-96"
-                title="Aperçu du reçu"
-                allow="autoplay"
+// ----------- Composant RapportAnnuel (modale) -----------
+
+export function RapportAnnuel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [annee, setAnnee] = useState<number>(new Date().getFullYear());
+  const [tab, setTab] = useState<"synthese" | "retards">("synthese");
+  const [loading, setLoading] = useState(false);
+  const [recus, setRecus] = useState<any[]>([]);
+  const [depenses, setDepenses] = useState<any[]>([]);
+  const { locataires } = useLocataires();
+  const [saving, setSaving] = useState(false);
+
+  // Pour retrouver le nom du locataire à partir de l'id
+  const getLocataireNom = (id: string) => {
+    const loc = (locataires || []).find(l => l.id === id);
+    return loc ? `${loc.prenom} ${loc.nom}` : id;
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    const recusValides = await recuService.getRecusValides();
+    const depensesFirestore = await depensesService.getDepenses();
+    setRecus(recusValides);
+    setDepenses(depensesFirestore);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchData();
+      setTab("synthese");
+    }
+    // eslint-disable-next-line
+  }, [open]);
+
+  // Prépare les données ressources/dépenses pour l'année
+  const ressources = (recus || [])
+    .filter(r => {
+      const d = r.updatedAt ? new Date(r.updatedAt) : null;
+      return d && d.getFullYear() === annee;
+    })
+    .map(r => ({
+      date: r.updatedAt ? new Date(r.updatedAt) : null,
+      client: r.locataireNom || getLocataireNom(r.locataireId),
+      montant: r.montant ?? 0,
+      description: r.description || "",
+    }));
+
+  const depensesList = (depenses || [])
+    .filter(d => {
+      const date = d.date ? new Date(d.date) : null;
+      return date && date.getFullYear() === annee;
+    })
+    .map(d => ({
+      date: d.date ? new Date(d.date) : null,
+      client: d.client,
+      montant: d.montant ?? 0,
+      description: d.description || "",
+    }));
+
+  const totalRessources = ressources.reduce((a, b) => a + b.montant, 0);
+  const totalDepenses = depensesList.reduce((a, b) => a + b.montant, 0);
+  const bilan = totalRessources - totalDepenses;
+
+  // Retards de paiement (locataires actuels uniquement, calcul à partir du mois d'entrée)
+  const locatairesActuels = (locataires || []).filter(l => !l.dateSortie);
+  const moisCourant = new Date().getMonth();
+  const clientsRetard = locatairesActuels.map((loc) => {
+    const dateEntree = new Date(loc.dateEntree);
+    const anneeEntree = dateEntree.getFullYear();
+    const moisEntree = dateEntree.getMonth();
+    const moisDebut = anneeEntree === annee ? moisEntree : 0;
+    const moisFin = (annee === new Date().getFullYear()) ? moisCourant : 11;
+
+    const recusLocataire = recus.filter(
+      (r) => r.locataireId === loc.id && new Date(r.updatedAt).getFullYear() === annee
+    );
+    const moisPayes = new Set<number>();
+    recusLocataire.forEach((r) => {
+      const mois = new Date(r.updatedAt).getMonth();
+      moisPayes.add(mois);
+    });
+    const moisNonPayes = [];
+    for (let m = moisDebut; m <= moisFin; m++) {
+      if (!moisPayes.has(m)) moisNonPayes.push(m);
+    }
+    return {
+      nom: `${loc.prenom} ${loc.nom}`,
+      moisNonPayes,
+      aJour: moisNonPayes.length === 0,
+    };
+  });
+
+  if (!open) return null;
+
+  // Nombre de lignes = le plus grand des deux tableaux
+  const maxRows = Math.max(ressources.length, depensesList.length);
+
+  // Fonction pour sauvegarder le rapport
+  const handleSaveRapport = async () => {
+    setSaving(true);
+    try {
+      const rapport = {
+        annee,
+        ressources,
+        depenses: depensesList,
+        totalRessources,
+        totalDepenses,
+        bilan,
+        date: new Date().toISOString(),
+      };
+      await saveRapportAnnuel(rapport);
+      onClose();
+    } catch (e) {
+      alert("Erreur lors de la sauvegarde du rapport.");
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl h-[90vh] p-0 flex flex-col relative overflow-hidden">
+        <button
+          className="absolute top-4 right-6 text-gray-500 hover:text-gray-700 z-10"
+          onClick={onClose}
+        >
+          ✕
+        </button>
+        <div className="flex flex-col h-full">
+          <div className="flex flex-col md:flex-row md:items-end gap-4 px-8 pt-8 pb-4">
+            <h2 className="text-2xl font-bold text-blue-700 flex-1">
+              Rapport annuel {annee}
+            </h2>
+            <div className="flex gap-2 items-end">
+              <label className="block text-sm font-medium mb-1">Année</label>
+              <input
+                type="number"
+                value={annee}
+                min={2020}
+                max={new Date().getFullYear()}
+                onChange={e => setAnnee(Number(e.target.value))}
+                className="border rounded px-2 py-1 w-28"
               />
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={fetchData}
+                disabled={loading}
+              >
+                Rafraîchir
+              </Button>
+            </div>
+          </div>
+          {/* Onglets */}
+          <div className="flex gap-2 border-b px-8">
+            <button
+              className={`py-2 px-4 font-semibold border-b-2 transition
+                ${tab === "synthese" ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-blue-600"}
+              `}
+              onClick={() => setTab("synthese")}
+            >
+              Synthèse
+            </button>
+            <button
+              className={`py-2 px-4 font-semibold border-b-2 transition
+                ${tab === "retards" ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-blue-600"}
+              `}
+              onClick={() => setTab("retards")}
+            >
+              Retards de paiement
+            </button>
+          </div>
+          {/* Contenu onglet */}
+          <div className="flex-1 overflow-auto px-8 py-4">
+            {loading ? (
+              <div className="text-blue-600">Chargement...</div>
+            ) : tab === "synthese" ? (
+              <div className="overflow-auto max-h-[60vh]">
+                <table className="min-w-full text-sm border table-fixed">
+                  <colgroup>
+                    <col style={{ width: "50%" }} />
+                    <col style={{ width: "50%" }} />
+                  </colgroup>
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border px-2 py-1 text-left">Ressources</th>
+                      <th className="border px-2 py-1 text-left">Dépenses</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...Array(maxRows)].map((_, idx) => (
+                      <tr key={idx}>
+                        <td className="border px-2 py-1 align-top max-w-xs break-words">
+                          {ressources[idx] ? (
+                            <div>
+                              <div className="font-medium text-green-700">{ressources[idx].client}</div>
+                              <div className="text-xs text-gray-500">{ressources[idx].date?.toLocaleDateString()}</div>
+                              <div className="text-xs">{ressources[idx].description}</div>
+                              <div className="font-bold text-green-800">{ressources[idx].montant.toLocaleString()} GNF</div>
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="border px-2 py-1 align-top max-w-xs break-words">
+                          {depensesList[idx] ? (
+                            <div>
+                              <div className="font-medium text-red-700">{depensesList[idx].client}</div>
+                              <div className="text-xs text-gray-500">{depensesList[idx].date?.toLocaleDateString()}</div>
+                              <div className="text-xs">{depensesList[idx].description}</div>
+                              <div className="font-bold text-red-800">{depensesList[idx].montant.toLocaleString()} GNF</div>
+                            </div>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold border-t bg-gray-50">
+                      <td className="border px-2 py-2">
+                        Total ressources : <span className="text-green-700">{totalRessources.toLocaleString()} GNF</span>
+                      </td>
+                      <td className="border px-2 py-2">
+                        Total dépenses : <span className="text-red-700">{totalDepenses.toLocaleString()} GNF</span>
+                      </td>
+                    </tr>
+                    <tr className="font-bold border-t bg-blue-50">
+                      <td colSpan={2} className="border px-2 py-2 text-center">
+                        Bilan (Ressources - Dépenses) :{" "}
+                        <span className={bilan >= 0 ? "text-green-700" : "text-red-700"}>
+                          {bilan.toLocaleString()} GNF
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className="flex justify-end mt-6">
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-2"
+                    onClick={handleSaveRapport}
+                    disabled={saving}
+                  >
+                    {saving ? "Enregistrement..." : "OK"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left py-1">Client</th>
+                      <th className="text-left py-1">Statut</th>
+                      <th className="text-left py-1">Mois non payés</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientsRetard.map((client, idx) => (
+                      <tr key={idx} className={client.aJour ? "bg-green-50" : "bg-red-50"}>
+                        <td className="py-1 font-medium">{client.nom}</td>
+                        <td className={`py-1 font-semibold ${client.aJour ? "text-green-700" : "text-red-700"}`}>
+                          {client.aJour ? "À jour" : "En retard"}
+                        </td>
+                        <td className="py-1">
+                          {client.aJour
+                            ? "0"
+                            : client.moisNonPayes.map(m => [
+                                "Janv", "Fév", "Mars", "Avr", "Mai", "Juin",
+                                "Juil", "Août", "Sept", "Oct", "Nov", "Déc"
+                              ][m]).join(", ")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
-      )}
-
-      {/* Modal de validation */}
-      {validationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-              onClick={() => setValidationModal(null)}
-            >
-              ✕
-            </button>
-            <div className="mb-4 font-semibold text-lg">Validation du reçu</div>
-            <div className="space-y-3">
-              <div>
-                <label className="block font-medium">Montant payé</label>
-                <input
-                  type="text"
-                  value={montant}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9.,]/g, "");
-                    setMontant(val);
-                  }}
-                  className="border rounded px-2 py-1 w-full"
-                  placeholder="Ex: 500"
-                  required
-                  inputMode="decimal"
-                  pattern="^\d+([.,]\d{1,2})?$"
-                />
-              </div>
-              <div>
-                <label className="block font-medium">
-                  Nombre de mois payés
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={mois}
-                  onChange={(e) => setMois(Number(e.target.value))}
-                  className="border rounded px-2 py-1 w-full mb-2"
-                  required
-                />
-                {/* Sélecteur de mois : n'affiche QUE les mois non payés */}
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {validationModal &&
-                    getSelectableMonths(validationModal.locataireId)
-                      .slice(0, 12)
-                      .filter(({ year, month }) => {
-                        const paidMonths = getPaidMonthsForClient(
-                          validationModal.locataireId,
-                          operations
-                        );
-                        return !paidMonths[`${year}-${month}`];
-                      })
-                      .map(({ year, month }) => {
-                        const isSelected = selectedMonths.some(
-                          (m) => m.year === year && m.month === month
-                        );
-                        const disabled =
-                          !isSelected && selectedMonths.length >= mois;
-                        return (
-                          <button
-                            key={`${year}-${month}`}
-                            type="button"
-                            disabled={disabled}
-                            className={`px-2 py-1 rounded border text-xs ${
-                              isSelected ? "bg-blue-600 text-white" : "bg-white"
-                            }`}
-                            onClick={() => {
-                              if (isSelected) {
-                                setSelectedMonths(
-                                  selectedMonths.filter(
-                                    (m) =>
-                                      !(m.year === year && m.month === month)
-                                  )
-                                );
-                              } else if (selectedMonths.length < mois) {
-                                setSelectedMonths([
-                                  ...selectedMonths,
-                                  { year, month },
-                                ]);
-                              }
-                            }}
-                          >
-                            {`${new Date(year, month - 1, 1).toLocaleString(
-                              "fr-FR",
-                              {
-                                month: "short",
-                              }
-                            )} ${year}`}
-                          </button>
-                        );
-                      })}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  Sélectionnez {mois} mois à valider.
-                </div>
-              </div>
-              <div>
-                <label className="block font-medium">Description / Note</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="border rounded px-2 py-1 w-full"
-                  rows={2}
-                  placeholder="Ajouter une note ou un détail (optionnel)"
-                />
-              </div>
-              <Button
-                onClick={async () => {
-                  await handleValidation();
-                }}
-                className="bg-green-600 hover:bg-green-700 text-white w-full"
-                disabled={loading || selectedMonths.length !== mois}
-              >
-                Valider le reçu
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de doublon */}
-      {showDuplicateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
-            <div className="mb-4 font-semibold text-lg text-red-600">
-              Attention : doublon détecté
-            </div>
-            <div className="mb-4">
-              Une opération identique existe déjà dans les dépenses ce mois-ci.
-              <br />
-              <b>Ligne existante :</b>
-              <div className="mb-4">
-                <div className="border rounded p-2 my-2 text-xs bg-gray-50">
-                  Client :{" "}
-                  {locataireNames[duplicateOperation?.client] ||
-                    duplicateOperation?.client}
-                  <br />
-                  Montant : {duplicateOperation?.montant}
-                  <br />
-                  Mois : {duplicateOperation?.mois}
-                  <br />
-                  Date :{" "}
-                  {duplicateOperation?.date &&
-                    new Date(duplicateOperation.date).toLocaleDateString()}
-                  <br />
-                  Description : {duplicateOperation?.description || "-"}
-                </div>
-                <b>Nouvelle ligne proposée :</b>
-                <div className="border rounded p-2 my-2 text-xs bg-blue-50">
-                  Client :{" "}
-                  {newOperation
-                    ? locataireNames[newOperation.client] || newOperation.client
-                    : ""}
-                  <br />
-                  Montant : {newOperation?.montant}
-                  <br />
-                  Mois : {newOperation?.mois}
-                  <br />
-                  Date :{" "}
-                  {newOperation?.date && newOperation.date.toLocaleDateString()}
-                  <br />
-                  Description : {newOperation?.description || "-"}
-                </div>
-              </div>
-              Voulez-vous vraiment continuer ?
-            </div>
-            <div className="flex gap-4">
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                onClick={async () => {
-                  setShowDuplicateModal(false);
-                  setDuplicateOperation(null);
-                  await handleValidation(true);
-                }}
-                disabled={loading}
-              >
-                Continuer quand même
-              </Button>
-              <Button
-                className="bg-gray-400 hover:bg-gray-500 text-white flex-1"
-                onClick={async () => {
-                  setShowDuplicateModal(false);
-                  setDuplicateOperation(null);
-                  if (validationModal?.id) {
-                    await handleRefus(validationModal.id);
-                    setValidationModal(null);
-                  }
-                }}
-                disabled={loading}
-              >
-                Annuler et refuser le reçu
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

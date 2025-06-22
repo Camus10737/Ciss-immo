@@ -15,6 +15,8 @@ import { DepotRecuForm } from "./components/DepotRecuForm";
 import { ValidationRecusAdmin } from "./components/ValidationRecusAdmin";
 import { DepensesList } from "./components/DepensesList";
 import { AjoutDepenseForm } from "./components/AjoutDepenseForm";
+import { RapportAnnuel } from "./components/RapportAnnuel";
+import { ListeRapportsFinanciers } from "./components/ListeRapportsFinanciers";
 
 export function ComptabiliteDetail({}) {
   const [activeTab, setActiveTab] = useState("revenus");
@@ -22,6 +24,8 @@ export function ComptabiliteDetail({}) {
   const [showDepenseForm, setShowDepenseForm] = useState(false);
   const [depenses, setDepenses] = useState<any[]>([]);
   const [refreshDepenses, setRefreshDepenses] = useState(0);
+  const [showRapport, setShowRapport] = useState(false);
+  const [refreshRapports, setRefreshRapports] = useState(0);
 
   // Filtrer les locataires actuels (pas de dateSortie)
   const locatairesActuels = (locataires || []).filter((l) => !l.dateSortie);
@@ -165,24 +169,32 @@ export function ComptabiliteDetail({}) {
         )}
 
         {activeTab === "rapports" && (
-          <Card className="bg-white border-0 shadow-sm">
-            <CardHeader className="pb-4 flex flex-row items-center justify-between">
-              <CardTitle className="text-lg text-gray-900 flex items-center">
-                <FileBarChart2 size={20} className="mr-3 text-blue-600" />
-                Rapports financiers
-              </CardTitle>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                size="sm"
-              >
-                Générer un rapport
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="text-gray-500">Aucun rapport disponible.</div>
-            </CardContent>
-          </Card>
-        )}
+  <Card className="bg-white border-0 shadow-sm">
+    <CardHeader className="pb-4 flex flex-row items-center justify-between">
+      <CardTitle className="text-lg text-gray-900 flex items-center">
+        <FileBarChart2 size={20} className="mr-3 text-blue-600" />
+        Rapports financiers
+      </CardTitle>
+      <Button
+        className="bg-blue-600 hover:bg-blue-700 text-white"
+        size="sm"
+        onClick={() => setShowRapport(true)}
+      >
+        Générer un rapport
+      </Button>
+    </CardHeader>
+    <CardContent>
+      <ListeRapportsFinanciers refresh={refreshRapports} />
+    </CardContent>
+    <RapportAnnuel
+      open={showRapport}
+      onClose={() => {
+        setShowRapport(false);
+        setRefreshRapports((r) => r + 1); // Rafraîchir la liste après ajout
+      }}
+    />
+  </Card>
+)}
 
         {activeTab === "recus" && (
           <Card className="bg-white border-0 shadow-sm">
