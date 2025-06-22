@@ -94,11 +94,15 @@ export const recuService = {
       where("statut", "==", "valide")
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-      createdAt: docSnap.data().createdAt?.toDate(),
-      updatedAt: docSnap.data().updatedAt?.toDate(),
-    })) as RecuPaiement[];
+    return snapshot.docs.map((docSnap) => {
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    description: data.commentaire || "", // <- on injecte ici le champ sous le bon nom
+    createdAt: data.createdAt?.toDate(),
+    updatedAt: data.updatedAt?.toDate(),
+  };
+}) as RecuPaiement[];
   },
 };

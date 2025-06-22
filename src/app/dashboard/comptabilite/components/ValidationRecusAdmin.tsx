@@ -38,7 +38,10 @@ function getLastPaidMonth(clientId: string, operations: any[]) {
     .forEach((op) => {
       if (Array.isArray(op.moisArray)) {
         op.moisArray.forEach((m: { year: number; month: number }) => {
-          if (m.year > last.year || (m.year === last.year && m.month > last.month)) {
+          if (
+            m.year > last.year ||
+            (m.year === last.year && m.month > last.month)
+          ) {
             last = { year: m.year, month: m.month };
           }
         });
@@ -63,17 +66,25 @@ export function ValidationRecusAdmin() {
   const [recus, setRecus] = useState<RecuPaiement[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalUrl, setModalUrl] = useState<string | null>(null);
-  const [locataireNames, setLocataireNames] = useState<Record<string, string>>({});
-  const [validationModal, setValidationModal] = useState<RecuPaiement | null>(null);
+  const [locataireNames, setLocataireNames] = useState<Record<string, string>>(
+    {}
+  );
+  const [validationModal, setValidationModal] = useState<RecuPaiement | null>(
+    null
+  );
   const [montant, setMontant] = useState<string>("");
   const [mois, setMois] = useState<number>(1);
   const [description, setDescription] = useState<string>("");
   const [operations, setOperations] = useState<any[]>([]);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-  const [duplicateOperation, setDuplicateOperation] = useState<any | null>(null);
+  const [duplicateOperation, setDuplicateOperation] = useState<any | null>(
+    null
+  );
 
   // Pour la sélection des mois à valider
-  const [selectedMonths, setSelectedMonths] = useState<{ year: number; month: number }[]>([]);
+  const [selectedMonths, setSelectedMonths] = useState<
+    { year: number; month: number }[]
+  >([]);
 
   const fetchRecus = async () => {
     setLoading(true);
@@ -106,7 +117,7 @@ export function ValidationRecusAdmin() {
         client: recu.locataireId,
         montant: recu.montant,
         mois: recu.moisPayes,
-        moisArray: recu.moisArray || recu.moisPayesArray || [], // <-- doit contenir [{year, month}]
+        moisArray: recu.moisArray || recu.moisPayesArray || [],
         date: recu.updatedAt ? new Date(recu.updatedAt) : new Date(),
         description: recu.description || "",
       })),
@@ -178,30 +189,46 @@ export function ValidationRecusAdmin() {
   const handleValidation = async (force = false) => {
   if (!validationModal) return;
 
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  await fetchOperations(); // recharge la liste complète
   const montantNumber = Number(montant);
 
-  if (!force) {
-    const duplicate = operations.find(
-      (op) =>
-        op.client === validationModal.locataireId &&
-        Number(op.montant) === montantNumber &&
-        op.mois === mois &&
-        op.date.getMonth() === currentMonth &&
-        op.date.getFullYear() === currentYear
-    );
+  const duplicateCandidates = operations.filter((op) => {
+    if (op.type !== "Ressource") return false;
+    if ((op.client || "").trim() !== validationModal.locataireId.trim()) return false;
+    if (Number(op.montant) !== montantNumber) return false;
 
-    if (duplicate) {
-      setDuplicateOperation(duplicate);
-      setShowDuplicateModal(true);
-      return;
+    const moisList: { year: number; month: number }[] = [];
+
+    if (Array.isArray(op.moisArray)) {
+      moisList.push(...op.moisArray);
+    } else if (Array.isArray(op.mois)) {
+      const y = new Date(op.date).getFullYear();
+      moisList.push(...op.mois.map((m: number) => ({ year: y, month: m })));
+    } else if (typeof op.mois === "number") {
+      const y = new Date(op.date).getFullYear();
+      moisList.push({ year: y, month: op.mois });
     }
+
+    return moisList.some(
+      (m) => m.year === currentYear && m.month === currentMonth
+    );
+  });
+
+  const duplicate = duplicateCandidates
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+  if (duplicate && !force) {
+    setDuplicateOperation(duplicate);
+    setShowDuplicateModal(true);
+    return;
   }
 
   setLoading(true);
 
-  // On passe les mois sélectionnés à la validation
   await recuService.validerRecu(
     validationModal.id,
     description,
@@ -210,16 +237,13 @@ export function ValidationRecusAdmin() {
     selectedMonths
   );
 
-  setValidationModal(null); // Ferme la modale AVANT de recharger
-
+  setValidationModal(null);
   await fetchRecus();
-  await fetchOperations(); // Recharge les opérations après validation
-
+  await fetchOperations();
   setShowDuplicateModal(false);
   setDuplicateOperation(null);
   setLoading(false);
 };
-
   // Refus classique
   const handleRefus = async (id: string) => {
     setLoading(true);
@@ -368,16 +392,15 @@ export function ValidationRecusAdmin() {
                         const isSelected = selectedMonths.some(
                           (m) => m.year === year && m.month === month
                         );
-                        const disabled = !isSelected && selectedMonths.length >= mois;
+                        const disabled =
+                          !isSelected && selectedMonths.length >= mois;
                         return (
                           <button
                             key={`${year}-${month}`}
                             type="button"
                             disabled={disabled}
                             className={`px-2 py-1 rounded border text-xs ${
-                              isSelected
-                                ? "bg-blue-600 text-white"
-                                : "bg-white"
+                              isSelected ? "bg-blue-600 text-white" : "bg-white"
                             }`}
                             onClick={() => {
                               if (isSelected) {
@@ -463,7 +486,9 @@ export function ValidationRecusAdmin() {
                 <b>Nouvelle ligne proposée :</b>
                 <div className="border rounded p-2 my-2 text-xs bg-blue-50">
                   Client :{" "}
-                  {locataireNames[newOperation?.client] || newOperation?.client}
+                  {newOperation
+                    ? locataireNames[newOperation.client] || newOperation.client
+                    : ""}
                   <br />
                   Montant : {newOperation?.montant}
                   <br />
@@ -507,5 +532,6 @@ export function ValidationRecusAdmin() {
           </div>
         </div>
       )}
-    </div>);
+    </div>
+  );
 }
