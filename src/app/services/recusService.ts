@@ -1,5 +1,14 @@
-import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, updateDoc, doc, query, where, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  updateDoc,
+  doc,
+  query,
+  where,
+  Timestamp,
+} from "firebase/firestore";
 import { RecuPaiement } from "@/app/types/recus";
 
 const COLLECTION_NAME = "recus";
@@ -23,9 +32,12 @@ export const recuService = {
   },
 
   async getRecusEnAttente(): Promise<RecuPaiement[]> {
-    const q = query(collection(db, COLLECTION_NAME), where("statut", "==", "en_attente"));
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where("statut", "==", "en_attente")
+    );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(docSnap => ({
+    return snapshot.docs.map((docSnap) => ({
       id: docSnap.id,
       ...docSnap.data(),
       createdAt: docSnap.data().createdAt?.toDate(),
@@ -49,20 +61,22 @@ export const recuService = {
   },
 
   // Modifié : accepte montant, nombre de mois et commentaire lors de la validation
-  async validerRecu(
-    id: string,
-    commentaire?: string,
-    montant?: number,
-    moisPayes?: number
-  ) {
-    await updateDoc(doc(db, COLLECTION_NAME, id), {
-      statut: "valide",
-      commentaire: commentaire || "",
-      montant: montant ?? null,
-      moisPayes: moisPayes ?? null,
-      updatedAt: Timestamp.now(),
-    });
-  },
+   async validerRecu(
+  id: string,
+  commentaire?: string,
+  montant?: number,
+  moisPayes?: number,
+  selectedMonths?: { year: number; month: number }[]
+) {
+  await updateDoc(doc(db, COLLECTION_NAME, id), {
+    statut: "valide",
+    commentaire: commentaire || "",
+    montant: montant ?? null,
+    moisPayes: moisPayes ?? null,
+    moisArray: selectedMonths ?? [],
+    updatedAt: Timestamp.now(),
+  });
+},
 
   async refuserRecu(id: string, commentaire?: string) {
     await updateDoc(doc(db, COLLECTION_NAME, id), {
@@ -72,15 +86,19 @@ export const recuService = {
     });
   },
 
-  async getRecusValides(): Promise<RecuPaiement[]> {
-  const q = query(collection(db, COLLECTION_NAME), where("statut", "==", "valide"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(docSnap => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-    createdAt: docSnap.data().createdAt?.toDate(),
-    updatedAt: docSnap.data().updatedAt?.toDate(),
-  })) as RecuPaiement[];
-},
-};
+ 
 
+  async getRecusValides(): Promise<RecuPaiement[]> {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where("statut", "==", "valide")
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+      createdAt: docSnap.data().createdAt?.toDate(),
+      updatedAt: docSnap.data().updatedAt?.toDate(),
+    })) as RecuPaiement[];
+  },
+};

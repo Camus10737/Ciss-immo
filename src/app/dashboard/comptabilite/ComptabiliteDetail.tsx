@@ -4,24 +4,31 @@ import { useState } from "react";
 import { useLocataires } from "@/hooks/useLocataires";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calculator, TrendingUp, Receipt, FileBarChart2, DollarSign } from "lucide-react";
+import {
+  Calculator,
+  TrendingUp,
+  Receipt,
+  FileBarChart2,
+  DollarSign,
+} from "lucide-react";
 import { DepotRecuForm } from "./components/DepotRecuForm";
 import { ValidationRecusAdmin } from "./components/ValidationRecusAdmin";
 import { DepensesList } from "./components/DepensesList";
 import { AjoutDepenseForm } from "./components/AjoutDepenseForm";
 
-export function ComptabiliteDetail({ }) {
+export function ComptabiliteDetail({}) {
   const [activeTab, setActiveTab] = useState("revenus");
   const { locataires, loading } = useLocataires();
   const [showDepenseForm, setShowDepenseForm] = useState(false);
   const [depenses, setDepenses] = useState<any[]>([]);
+  const [refreshDepenses, setRefreshDepenses] = useState(0);
 
   // Filtrer les locataires actuels (pas de dateSortie)
-  const locatairesActuels = (locataires || []).filter(l => !l.dateSortie);
+  const locatairesActuels = (locataires || []).filter((l) => !l.dateSortie);
 
   // Ajout d'une dépense (tu peux remplacer ce stockage local par un enregistrement en base)
   const handleSaveDepense = (depense: any) => {
-    setDepenses(prev => [...prev, depense]);
+    setDepenses((prev) => [...prev, depense]);
   };
 
   return (
@@ -47,33 +54,43 @@ export function ComptabiliteDetail({ }) {
           <button
             onClick={() => setActiveTab("revenus")}
             className={`flex-1 flex flex-col items-start p-4 rounded-xl border transition
-              ${activeTab === "revenus"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
-                : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"}
+              ${
+                activeTab === "revenus"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
+                  : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"
+              }
             `}
           >
             <DollarSign size={24} className="mb-2" />
             <span className="font-semibold text-lg">Soumettre un reçu</span>
-            <span className="text-xs text-gray-400">Suivi des paiements reçus</span>
+            <span className="text-xs text-gray-400">
+              Suivi des paiements reçus
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("depenses")}
             className={`flex-1 flex flex-col items-start p-4 rounded-xl border transition
-              ${activeTab === "depenses"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
-                : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"}
+              ${
+                activeTab === "depenses"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
+                  : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"
+              }
             `}
           >
             <TrendingUp size={24} className="mb-2" />
             <span className="font-semibold text-lg">Dépenses</span>
-            <span className="text-xs text-gray-400">Gestion des sorties d'argent</span>
+            <span className="text-xs text-gray-400">
+              Gestion des sorties d'argent
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("rapports")}
             className={`flex-1 flex flex-col items-start p-4 rounded-xl border transition
-              ${activeTab === "rapports"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
-                : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"}
+              ${
+                activeTab === "rapports"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
+                  : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"
+              }
             `}
           >
             <FileBarChart2 size={24} className="mb-2" />
@@ -83,14 +100,18 @@ export function ComptabiliteDetail({ }) {
           <button
             onClick={() => setActiveTab("recus")}
             className={`flex-1 flex flex-col items-start p-4 rounded-xl border transition
-              ${activeTab === "recus"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
-                : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"}
+              ${
+                activeTab === "recus"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
+                  : "bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border-gray-200"
+              }
             `}
           >
             <Receipt size={24} className="mb-2" />
             <span className="font-semibold text-lg">Validation des reçus</span>
-            <span className="text-xs text-gray-400">Contrôle des justificatifs</span>
+            <span className="text-xs text-gray-400">
+              Contrôle des justificatifs
+            </span>
           </button>
         </div>
 
@@ -131,11 +152,14 @@ export function ComptabiliteDetail({ }) {
             <CardContent>
               {showDepenseForm && (
                 <AjoutDepenseForm
-                  onSave={handleSaveDepense}
+                  onSave={() => {
+                    setShowDepenseForm(false);
+                    setRefreshDepenses((r) => r + 1);
+                  }}
                   onClose={() => setShowDepenseForm(false)}
                 />
               )}
-              <DepensesList depenses={depenses} />
+              <DepensesList refresh={refreshDepenses} />
             </CardContent>
           </Card>
         )}
