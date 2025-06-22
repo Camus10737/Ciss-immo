@@ -314,7 +314,15 @@ export function BuildingDetail({
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex justify-between items-center py-2">
-                      <span className="font-medium text-gray-700">Ville :</span>
+                      <span className="font-medium text-gray-700">Pays :</span>
+                      <span className="font-semibold text-gray-900">
+                        {immeuble.pays}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="font-medium text-gray-700">
+                        Ville :
+                      </span>
                       <span className="font-semibold text-gray-900">
                         {immeuble.ville}
                       </span>
@@ -325,14 +333,6 @@ export function BuildingDetail({
                       </span>
                       <span className="font-semibold text-gray-900">
                         {immeuble.quartier}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center py-2">
-                      <span className="font-medium text-gray-700">
-                        Secteur :
-                      </span>
-                      <span className="font-semibold text-gray-900">
-                        {immeuble.secteur}
                       </span>
                     </div>
                   </CardContent>

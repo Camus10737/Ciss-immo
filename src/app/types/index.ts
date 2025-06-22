@@ -39,31 +39,31 @@ export interface Appartement {
 export interface Immeuble {
   id: string;
   nom: string;
+  pays: string;      // <-- ajoute cette ligne
   ville: string;
   quartier: string;
-  secteur: string;
-  type: 'habitation' | 'commercial' | 'mixte';
+  type: string;
   nombreAppartements: number;
-  proprietaireActuel: Proprietaire;
-  historiqueProprietaires: Proprietaire[];
-  appartements: Appartement[];
-  gestionnaireId?: string; 
-  createdAt: Date;
-  updatedAt: Date;
+  proprietaireActuel: {
+    nom: string;
+    prenom: string;
+    email: string;
+    telephone: string;
+  };
 }
 
 export interface ImmeubleFormData {
   nom: string;
+  pays: string;      // <-- ajoute cette ligne
   ville: string;
   quartier: string;
-  secteur: string;
-  type: 'habitation' | 'commercial' | 'mixte';
+  type: string;
   nombreAppartements: number;
   proprietaire: {
     nom: string;
     prenom: string;
-    email?: string;
-    telephone?: string;
+    email: string;
+    telephone: string;
   };
 }
 

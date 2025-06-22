@@ -265,7 +265,7 @@ export function BuildingList() {
                 <div className="flex items-center text-gray-600">
                   <MapPin size={16} className="mr-3 text-blue-500" />
                   <span className="text-sm">
-                    {immeuble.ville} • {immeuble.quartier} • {immeuble.secteur}
+                    {immeuble.pays} • {immeuble.ville} • {immeuble.quartier}
                   </span>
                 </div>
 
