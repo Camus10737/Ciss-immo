@@ -4,7 +4,7 @@ import { getRapportsAnnuels, deleteRapportAnnuel } from "@/app/services/rapportS
 import { RapportAnnuel } from "./RapportAnnuel";
 import { Trash2 } from "lucide-react";
 
-export function ListeRapportsFinanciers({ refresh }: { refresh: number }) {
+export function ListeRapportsFinanciers({ refresh, immeubles }: { refresh: number; immeubles: any[] }) {
   const [rapports, setRapports] = useState<any[]>([]);
   const [selectedRapport, setSelectedRapport] = useState<any | null>(null);
 
@@ -38,6 +38,13 @@ export function ListeRapportsFinanciers({ refresh }: { refresh: number }) {
               onClick={() => setSelectedRapport(r)}
             >
               Rapport annuel {r.annee}
+              {r.immeubleId && (
+                <span className="ml-2 text-xs text-gray-600">
+                  (
+                    {immeubles.find(im => im.id === r.immeubleId)?.nom || "Immeuble inconnu"}
+                  )
+                </span>
+              )}
               <span className="ml-2 text-xs text-gray-400">
                 {r.date ? new Date(r.date).toLocaleDateString() : ""}
               </span>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocataires } from "@/hooks/useLocataires";
+import { immeublesService } from "@/app/services/immeublesService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,14 +22,28 @@ import { ListeRapportsFinanciers } from "./components/ListeRapportsFinanciers";
 export function ComptabiliteDetail({}) {
   const [activeTab, setActiveTab] = useState("revenus");
   const { locataires, loading } = useLocataires();
+  const [immeubles, setImmeubles] = useState<any[]>([]);
   const [showDepenseForm, setShowDepenseForm] = useState(false);
   const [depenses, setDepenses] = useState<any[]>([]);
   const [refreshDepenses, setRefreshDepenses] = useState(0);
   const [showRapport, setShowRapport] = useState(false);
   const [refreshRapports, setRefreshRapports] = useState(0);
 
+  // Pour filtrer les dépenses par immeuble
+  const [selectedImmeuble, setSelectedImmeuble] = useState<string>("");
+
+  // Pour filtrer les rapports par immeuble
+  const [selectedImmeubleRapport, setSelectedImmeubleRapport] = useState<string>("");
+
   // Filtrer les locataires actuels (pas de dateSortie)
   const locatairesActuels = (locataires || []).filter((l) => !l.dateSortie);
+
+  // Récupérer les immeubles au chargement du composant
+  useEffect(() => {
+    immeublesService.obtenirImmeubles().then(res => {
+      setImmeubles(res.success && res.data ? res.data : []);
+    });
+  }, []);
 
   // Ajout d'une dépense (tu peux remplacer ce stockage local par un enregistrement en base)
   const handleSaveDepense = (depense: any) => {
@@ -132,7 +147,7 @@ export function ComptabiliteDetail({}) {
               {loading ? (
                 <div>Chargement des locataires...</div>
               ) : (
-                <DepotRecuForm locataires={locatairesActuels} />
+                <DepotRecuForm locataires={locatairesActuels} immeubles={immeubles} />
               )}
             </CardContent>
           </Card>
@@ -154,6 +169,22 @@ export function ComptabiliteDetail({}) {
               </Button>
             </CardHeader>
             <CardContent>
+              {/* Select immeuble pour filtrer les dépenses */}
+              <div className="mb-4">
+                <label className="block font-medium mb-1">Filtrer par immeuble</label>
+                <select
+                  value={selectedImmeuble}
+                  onChange={e => setSelectedImmeuble(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="">Tous les immeubles</option>
+                  {immeubles.map(im => (
+                    <option key={im.id} value={im.id}>
+                      {im.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
               {showDepenseForm && (
                 <AjoutDepenseForm
                   onSave={() => {
@@ -161,40 +192,58 @@ export function ComptabiliteDetail({}) {
                     setRefreshDepenses((r) => r + 1);
                   }}
                   onClose={() => setShowDepenseForm(false)}
+                  immeubleId={selectedImmeuble}
                 />
               )}
-              <DepensesList refresh={refreshDepenses} />
+              <DepensesList refresh={refreshDepenses} immeubleId={selectedImmeuble} />
             </CardContent>
           </Card>
         )}
 
         {activeTab === "rapports" && (
-  <Card className="bg-white border-0 shadow-sm">
-    <CardHeader className="pb-4 flex flex-row items-center justify-between">
-      <CardTitle className="text-lg text-gray-900 flex items-center">
-        <FileBarChart2 size={20} className="mr-3 text-blue-600" />
-        Rapports financiers
-      </CardTitle>
-      <Button
-        className="bg-blue-600 hover:bg-blue-700 text-white"
-        size="sm"
-        onClick={() => setShowRapport(true)}
-      >
-        Générer un rapport
-      </Button>
-    </CardHeader>
-    <CardContent>
-      <ListeRapportsFinanciers refresh={refreshRapports} />
-    </CardContent>
-    <RapportAnnuel
-      open={showRapport}
-      onClose={() => {
-        setShowRapport(false);
-        setRefreshRapports((r) => r + 1); // Rafraîchir la liste après ajout
-      }}
-    />
-  </Card>
-)}
+          <Card className="bg-white border-0 shadow-sm">
+            <CardHeader className="pb-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-lg text-gray-900 flex items-center">
+                <FileBarChart2 size={20} className="mr-3 text-blue-600" />
+                Rapports financiers
+              </CardTitle>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+                onClick={() => setShowRapport(true)}
+              >
+                Générer un rapport
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {/* Select immeuble pour filtrer le rapport */}
+              <div className="mb-4">
+                <label className="block font-medium mb-1">Filtrer le rapport par immeuble</label>
+                <select
+                  value={selectedImmeubleRapport}
+                  onChange={e => setSelectedImmeubleRapport(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="">Tous les immeubles</option>
+                  {immeubles.map(im => (
+                    <option key={im.id} value={im.id}>
+                      {im.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <ListeRapportsFinanciers refresh={refreshRapports} immeubles={immeubles} />
+            </CardContent>
+            <RapportAnnuel
+              open={showRapport}
+              onClose={() => {
+                setShowRapport(false);
+                setRefreshRapports((r) => r + 1);
+              }}
+              immeubleId={selectedImmeubleRapport}
+            />
+          </Card>
+        )}
 
         {activeTab === "recus" && (
           <Card className="bg-white border-0 shadow-sm">

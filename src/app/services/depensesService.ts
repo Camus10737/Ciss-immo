@@ -4,7 +4,7 @@ import { collection, addDoc, getDocs, Timestamp } from "firebase/firestore";
 const COLLECTION_NAME = "depenses";
 
 export const depensesService = {
-  async ajouterDepense(depense: { client: string; description?: string; montant: number; date: Date }) {
+  async ajouterDepense(depense: { client: string; description?: string; montant: number; date: Date; immeubleId: string }) {
     await addDoc(collection(db, COLLECTION_NAME), {
       ...depense,
       date: Timestamp.fromDate(depense.date),

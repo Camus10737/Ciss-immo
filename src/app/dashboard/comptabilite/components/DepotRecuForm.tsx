@@ -7,22 +7,37 @@ interface Locataire {
   id: string;
   nom: string;
   prenom: string;
-  appartementId: string; // <-- ajoute ce champ
+  appartementId: string;
+  immeubleId: string; // <-- ajoute ce champ
+}
+
+interface Immeuble {
+  id: string;
+  nom: string;
 }
 
 export function DepotRecuForm({
   locataires = [],
+  immeubles = [],
 }: {
   locataires: Locataire[];
+  immeubles: Immeuble[];
 }) {
+  const [selectedImmeuble, setSelectedImmeuble] = useState<string>("");
   const [selectedLocataire, setSelectedLocataire] = useState<string>("");
   const [moisPayes, setMoisPayes] = useState(1);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Trouve le locataire sélectionné dans le tableau
-  const selectedLocataireObj = locataires.find(l => l.id === selectedLocataire);
+  // Filtre les locataires selon l'immeuble sélectionné
+  const filteredLocataires = selectedImmeuble
+    ? locataires.filter((l) => l.immeubleId === selectedImmeuble)
+    : [];
+
+  const selectedLocataireObj = filteredLocataires.find(
+    (l) => l.id === selectedLocataire
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +52,6 @@ export function DepotRecuForm({
     setLoading(true);
     setMessage(null);
     try {
-      // 1. Upload du fichier sur Cloudinary via l'API route
       const formData = new FormData();
       formData.append("file", file);
 
@@ -53,41 +67,63 @@ export function DepotRecuForm({
       const data = await res.json();
       const fichierUrl = data.url;
 
-      // 2. Utilise l'appartementId du locataire sélectionné
       await recuService.creerRecu(
         selectedLocataireObj.id,
         selectedLocataireObj.appartementId,
         moisPayes,
-        fichierUrl
+        fichierUrl,
+        selectedImmeuble // <-- Ajoute l'immeuble sélectionné ici
       );
 
       setMessage("Reçu envoyé avec succès !");
       setFile(null);
       setMoisPayes(1);
       setSelectedLocataire("");
+      setSelectedImmeuble("");
     } catch (err) {
       setMessage("Erreur lors de l'envoi du reçu.");
     }
     setLoading(false);
   };
 
-  if (locataires.length === 0) {
-    return <div className="text-gray-500">Aucun locataire actuel disponible.</div>;
+  if (immeubles.length === 0) {
+    return <div className="text-gray-500">Aucun immeuble disponible.</div>;
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <label className="block">Locataire ayant payé</label>
+      <label className="block">Immeuble</label>
       <select
-        value={selectedLocataire}
-        onChange={e => setSelectedLocataire(e.target.value)}
+        value={selectedImmeuble}
+        onChange={(e) => {
+          setSelectedImmeuble(e.target.value);
+          setSelectedLocataire(""); // reset locataire quand immeuble change
+        }}
         className="border rounded px-2 py-1 w-full"
         required
       >
         <option value="" disabled>
+          Sélectionner un immeuble
+        </option>
+        {immeubles.map((im) => (
+          <option key={im.id} value={im.id}>
+            {im.nom}
+          </option>
+        ))}
+      </select>
+
+      <label className="block">Locataire ayant payé</label>
+      <select
+        value={selectedLocataire}
+        onChange={(e) => setSelectedLocataire(e.target.value)}
+        className="border rounded px-2 py-1 w-full"
+        required
+        disabled={!selectedImmeuble}
+      >
+        <option value="" disabled>
           Sélectionner un locataire
         </option>
-        {locataires.map(l => (
+        {filteredLocataires.map((l) => (
           <option key={l.id} value={l.id}>
             {l.prenom} {l.nom}
           </option>
@@ -100,7 +136,7 @@ export function DepotRecuForm({
         min={1}
         max={12}
         value={moisPayes}
-        onChange={e => setMoisPayes(Number(e.target.value))}
+        onChange={(e) => setMoisPayes(Number(e.target.value))}
         className="border rounded px-2 py-1"
       />
 
@@ -110,7 +146,7 @@ export function DepotRecuForm({
           id="file-upload"
           type="file"
           accept="image/*,application/pdf"
-          onChange={e => setFile(e.target.files?.[0] || null)}
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="hidden"
         />
         <Button

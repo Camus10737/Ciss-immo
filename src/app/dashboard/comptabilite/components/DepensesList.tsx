@@ -17,6 +17,7 @@ interface DepenseManuelle {
   description?: string;
   montant: number;
   date: Date;
+  immeubleId?: string; // <-- Ajouté pour le filtrage
 }
 
 type DateRange = {
@@ -24,7 +25,7 @@ type DateRange = {
   to?: Date;
 };
 
-export function DepensesList({ refresh = 0 }: { refresh?: number }) {
+export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; immeubleId?: string }) {
   const [recus, setRecus] = useState<RecuPaiement[]>([]);
   const [locataireNames, setLocataireNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -72,9 +73,18 @@ export function DepensesList({ refresh = 0 }: { refresh?: number }) {
     fetchRecus();
   }, []);
 
+  // Filtrage selon l'immeuble sélectionné
+  const filteredRecus = immeubleId
+    ? recus.filter(recu => recu.immeubleId === immeubleId)
+    : recus;
+
+  const filteredDepensesFirestore = immeubleId
+    ? depensesFirestore.filter(dep => dep.immeubleId === immeubleId)
+    : depensesFirestore;
+
   // Fusionne reçus validés et dépenses Firestore
   const operations = [
-    ...recus.map(recu => ({
+    ...filteredRecus.map(recu => ({
       type: "Ressource",
       client: locataireNames[recu.locataireId] || recu.locataireId,
       montant: recu.montant ?? 0,
@@ -82,7 +92,7 @@ export function DepensesList({ refresh = 0 }: { refresh?: number }) {
       date: recu.updatedAt ? new Date(recu.updatedAt) : new Date(),
       url: recu.fichierUrl,
     })),
-    ...depensesFirestore.map(dep => ({
+    ...filteredDepensesFirestore.map(dep => ({
       type: "Dépense",
       client: dep.client,
       montant: dep.montant,

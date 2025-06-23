@@ -33,9 +33,13 @@ export const createLocataire = async (
   userId: string
 ): Promise<string> => {
   try {
+    // Récupère l'immeubleId à partir de l'appartementId
+    const immeubleId = await synchronisationService.trouverImmeubleParAppartement(locataireData.appartementId);
+
     const docData: any = {
       ...locataireData,
       userId,
+      immeubleId, // <-- Ajout du champ immeubleId
       dateEntree: Timestamp.fromDate(locataireData.dateEntree),
       finBailProbable: locataireData.finBailProbable 
         ? Timestamp.fromDate(locataireData.finBailProbable) 
@@ -54,14 +58,13 @@ export const createLocataire = async (
     
     const docRef = await addDoc(collection(db, COLLECTION_NAME), docData);
     
-    // 🔥 NOUVEAU : Synchroniser avec l'immeuble
+    // 🔥 Synchroniser avec l'immeuble
     const nouveauLocataire: Locataire = {
       ...convertFirestoreData(docData),
       id: docRef.id,
     };
     
-    // Trouver l'immeuble et assigner le locataire
-    const immeubleId = await synchronisationService.trouverImmeubleParAppartement(locataireData.appartementId);
+    // Utilise la variable immeubleId déjà déclarée plus haut
     await synchronisationService.assignerLocataireAAppartement(
       immeubleId,
       locataireData.appartementId,
@@ -114,7 +117,7 @@ export const getLocataireById = async (id: string): Promise<Locataire | null> =>
   }
 };
 
-// 🔥 NOUVEAU : Récupérer les locataires d'un appartement spécifique
+// 🔥 Récupérer les locataires d'un appartement spécifique
 export const getLocatairesByAppartement = async (appartementId: string): Promise<Locataire[]> => {
   try {
     const q = query(
@@ -134,7 +137,7 @@ export const getLocatairesByAppartement = async (appartementId: string): Promise
   }
 };
 
-// 🔥 NOUVEAU : Récupérer le locataire actuel d'un appartement
+// 🔥 Récupérer le locataire actuel d'un appartement
 export const getLocataireActuelByAppartement = async (appartementId: string): Promise<Locataire | null> => {
   try {
     const q = query(

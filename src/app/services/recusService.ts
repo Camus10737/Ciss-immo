@@ -18,11 +18,13 @@ export const recuService = {
     locataireId: string,
     appartementId: string,
     moisPayes: number,
-    fichierUrl: string
+    fichierUrl: string,
+    immeubleId: string 
   ): Promise<void> {
     await addDoc(collection(db, COLLECTION_NAME), {
       locataireId,
       appartementId,
+      immeubleId, 
       moisPayes,
       fichierUrl,
       statut: "en_attente",

@@ -5,7 +5,15 @@ import { depensesService } from "@/app/services/depensesService";
 
 const comptesDefaut = ["Autres"];
 
-export function AjoutDepenseForm({ onSave, onClose }: { onSave: () => void; onClose: () => void }) {
+export function AjoutDepenseForm({
+  onSave,
+  onClose,
+  immeubleId, // <-- Ajoute cette prop
+}: {
+  onSave: () => void;
+  onClose: () => void;
+  immeubleId: string; // <-- Ajoute cette prop
+}) {
   const [comptes, setComptes] = useState<string[]>(comptesDefaut);
   const [client, setClient] = useState("");
   const [description, setDescription] = useState("");
@@ -30,6 +38,7 @@ export function AjoutDepenseForm({ onSave, onClose }: { onSave: () => void; onCl
       description,
       montant: Number(montant),
       date: new Date(),
+      immeubleId, // <-- Ajoute l'immeubleId ici
     });
     // Si un nouveau compte a été ajouté, on le sauvegarde dans le localStorage
     if (showAddCompte && nouveauCompte && !comptes.includes(nouveauCompte)) {

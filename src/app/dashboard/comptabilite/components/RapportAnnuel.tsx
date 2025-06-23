@@ -33,11 +33,13 @@ export function RapportAnnuel({
   onClose,
   rapport,
   readOnly = false,
+  immeubleId, // <-- Ajout de la prop
 }: {
   open: boolean;
   onClose: () => void;
   rapport?: any;
   readOnly?: boolean;
+  immeubleId?: string; // <-- Ajout de la prop
 }) {
   // Si on est en lecture seule, on utilise les données du rapport passé en props
   const [annee, setAnnee] = useState<number>(
@@ -60,8 +62,17 @@ export function RapportAnnuel({
     setLoading(true);
     const recusValides = await recuService.getRecusValides();
     const depensesFirestore = await depensesService.getDepenses();
-    setRecus(recusValides);
-    setDepenses(depensesFirestore);
+
+    // Filtrage par immeuble
+    const recusFiltres = immeubleId
+      ? recusValides.filter(r => r.immeubleId === immeubleId)
+      : recusValides;
+    const depensesFiltres = immeubleId
+      ? depensesFirestore.filter(d => d.immeubleId === immeubleId)
+      : depensesFirestore;
+
+    setRecus(recusFiltres);
+    setDepenses(depensesFiltres);
     setLoading(false);
   };
 
@@ -71,7 +82,7 @@ export function RapportAnnuel({
       setTab("synthese");
     }
     // eslint-disable-next-line
-  }, [open, rapport]);
+  }, [open, rapport, immeubleId]); // <-- Ajoute immeubleId dans les dépendances
 
   // Données à afficher : si rapport fourni, on l'utilise, sinon on calcule
   const ressources = rapport?.ressources
@@ -117,6 +128,8 @@ export function RapportAnnuel({
   const clientsRetard =
     rapport?.clientsRetard ??
     locatairesActuels.map((loc) => {
+      // Si filtrage immeuble, ne garder que les locataires de l'immeuble
+      if (immeubleId && loc.immeubleId !== immeubleId) return null;
       const dateEntree = new Date(loc.dateEntree);
       const anneeEntree = dateEntree.getFullYear();
       const moisEntree = dateEntree.getMonth();
@@ -145,7 +158,7 @@ export function RapportAnnuel({
         moisNonPayes,
         aJour: moisNonPayes.length === 0,
       };
-    });
+    }).filter(Boolean); // <-- enlève les null
 
   if (!open) return null;
 
@@ -176,6 +189,7 @@ export function RapportAnnuel({
         bilan,
         clientsRetard: clientsRetardToSave,
         date: new Date().toISOString(),
+        immeubleId: immeubleId || null, // <-- Ajoute l'immeubleId au rapport sauvegardé
       };
       await saveRapportAnnuel(rapportToSave);
       onClose();
@@ -410,5 +424,5 @@ export function RapportAnnuel({
         </div>
       </div>
     </div>
-  );
+  )
 }
