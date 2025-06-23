@@ -21,9 +21,11 @@ export type ActionType =
 export interface ActivityLog {
   id: string;
   action: ActionType;
-  performedBy: string; // ID de l'utilisateur qui a fait l'action
-  performedByName: string; // Nom pour l'affichage
-  targetUserId?: string; // ID de l'utilisateur cible (si applicable)
+  // ID de l'utilisateur qui a fait l'action
+  performedBy: string; 
+  // Nom pour l'affichage
+  performedByName: string; 
+  targetUserId?: string; // ID de l'utilisateur cible 
   targetUserName?: string; // Nom de l'utilisateur cible
   details: {
     immeubleId?: string;
@@ -38,7 +40,7 @@ export interface ActivityLog {
 }
 
 /**
- * 🔐 TOKENS ET SÉCURITÉ
+ TOKENS 
  */
 export interface InvitationToken {
   id: string;
@@ -62,7 +64,7 @@ export interface SecurityEvent {
 }
 
 /**
- * 📊 STATISTIQUES UTILISATEURS
+ STATISTIQUES UTILISATEURS
  */
 export interface UserStats {
   totalGestionnaires: number;

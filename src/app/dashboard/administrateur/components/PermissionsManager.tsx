@@ -7,12 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Shield, 
-  User, 
   Building2, 
-  Settings, 
   Calculator,
   BarChart3,
-  Trash2,
   RefreshCw,
   Edit,
   CheckCircle,
@@ -25,7 +22,7 @@ import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Gestionnaire } from "@/app/types/user-management";
 import { Immeuble } from "@/app/types/index";
 import { BuildingDetail } from "../../immeubles/buildingDetail";
-import { EditPermissionsModal } from "./EditPermissionsModal"; // 🆕 Import de la nouvelle modal
+import { EditPermissionsModal } from "./EditPermissionsModal"; 
 import { toast } from "sonner";
 
 interface PermissionsManagerProps {
@@ -112,10 +109,10 @@ export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
     );
   };
 
-  // 🆕 Gestion du succès de modification des permissions
+  //  Gestion du succès de modification des permissions
   const handlePermissionsSuccess = () => {
-    loadData(); // Recharger les données
-    setSelectedGestionnaire(null); // Fermer la modal
+    loadData(); 
+    setSelectedGestionnaire(null);
   };
 
   // Si un immeuble est sélectionné, afficher ses détails
@@ -352,7 +349,7 @@ export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
         ))}
       </div>
 
-      {/* 🆕 Modal de modification des permissions - remplace l'ancien TODO */}
+      /* Modal de modification des permissions */
       <EditPermissionsModal
         gestionnaire={selectedGestionnaire}
         immeubles={immeubles}

@@ -17,13 +17,13 @@ import { Gestionnaire, LocataireUser, SuperAdmin } from '../types/user-managemen
 import { Appartement, Immeuble, Locataire } from '../types';
 
 /**
- * 🔐 SERVICE DE FILTRAGE AUTOMATIQUE DES DONNÉES
+ *SERVICE DE FILTRAGE AUTOMATIQUE DES DONNÉES
  * Assure l'isolation des données selon les permissions utilisateur
  */
 export class DataFilterService {
 
   /**
-   * 👤 Récupérer un utilisateur par ID (méthode interne pour éviter l'import circulaire)
+   * Récupérer un utilisateur par ID
    */
   private static async getUserById(userId: string): Promise<SuperAdmin | Gestionnaire | LocataireUser | null> {
     try {
@@ -49,7 +49,7 @@ export class DataFilterService {
   }
 
   /**
-   * 🏢 Récupérer les immeubles selon les permissions
+    Récupérer les immeubles selon les permissions
    */
   static async getFilteredImmeubles(userId: string): Promise<Immeuble[]> {
     try {
@@ -73,17 +73,17 @@ export class DataFilterService {
           if (gestionnaire.immeubles_assignes && gestionnaire.immeubles_assignes.length > 0) {
             q = query(
               collection(db, 'immeubles'),
-              where('id', 'in', gestionnaire.immeubles_assignes.slice(0, 10)), // Firestore limite à 10
+              where('id', 'in', gestionnaire.immeubles_assignes.slice(0, 10)), 
               orderBy('createdAt', 'desc')
             );
           } else {
-            return []; // Aucun immeuble assigné
+            return []; 
           }
           break;
 
         case 'LOCATAIRE':
           const locataire = user as LocataireUser;
-          // Locataire voit seulement son immeuble (via appartementId)
+          // Locataire voit seulement son immeuble 
           const appartement = await this.getAppartementById(locataire.appartementId);
           if (!appartement) return [];
           
@@ -112,7 +112,7 @@ export class DataFilterService {
   }
 
   /**
-   * 👥 Récupérer les locataires selon les permissions
+    Récupérer les locataires selon les permissions
    */
   static async getFilteredLocataires(userId: string): Promise<Locataire[]> {
     try {
@@ -144,7 +144,7 @@ export class DataFilterService {
           
           q = query(
             collection(db, 'locataires'),
-            where('appartementId', 'in', appartementIds.slice(0, 10)), // Firestore limite à 10
+            where('appartementId', 'in', appartementIds.slice(0, 10)), 
             orderBy('createdAt', 'desc')
           );
           break;
@@ -179,7 +179,7 @@ export class DataFilterService {
   }
 
   /**
-   * 🏠 Récupérer les appartements selon les permissions
+    Récupérer les appartements selon les permissions
    */
   static async getFilteredAppartements(userId: string, immeubleId?: string): Promise<Appartement[]> {
     try {
@@ -262,7 +262,7 @@ export class DataFilterService {
   }
 
   /**
-   * 🔐 Vérifier si un utilisateur peut accéder à un immeuble
+   Vérifier si un utilisateur peut accéder à un immeuble
    */
   static async canAccessImmeuble(userId: string, immeubleId: string): Promise<boolean> {
     try {
@@ -271,7 +271,8 @@ export class DataFilterService {
 
       switch (user.role) {
         case 'SUPER_ADMIN':
-          return true; // SUPER_ADMIN a accès à tout
+            // SUPER_ADMIN a accès à tout
+          return true; 
 
         case 'GESTIONNAIRE':
           const gestionnaire = user as Gestionnaire;
@@ -293,7 +294,7 @@ export class DataFilterService {
   }
 
   /**
-   * 🔐 Vérifier les permissions spécifiques
+   Vérifier les permissions spécifiques
    */
   static async canAccessComptabilite(userId: string, immeubleId: string): Promise<boolean> {
     try {
@@ -359,7 +360,7 @@ export class DataFilterService {
   }
 
   /**
-   * 🔧 MÉTHODES UTILITAIRES PRIVÉES
+   MÉTHODES UTILITAIRES PRIVÉES
    */
   
   private static async getAppartementById(appartementId: string): Promise<Appartement | null> {
@@ -388,7 +389,7 @@ export class DataFilterService {
 
   private static async getAppartementIdsByImmeubles(immeubleIds: string[]): Promise<string[]> {
     try {
-      // Pour éviter la limite de 10 dans 'in', traiter par batch
+      // Pour éviter la limite de 10 dans 'in', URILISATION DE  batch
       const allAppartementIds: string[] = [];
       
       for (let i = 0; i < immeubleIds.length; i += 10) {

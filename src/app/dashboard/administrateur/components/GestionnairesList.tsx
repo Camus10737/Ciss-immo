@@ -76,7 +76,7 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
 
       if (result.success) {
         toast.success(`Gestionnaire ${newStatus === 'active' ? 'activé' : 'désactivé'}`);
-        loadGestionnaires(); // Recharger la liste
+        loadGestionnaires(); 
       } else {
         toast.error(result.error || "Erreur lors du changement de statut");
       }
@@ -97,7 +97,7 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
 
       if (result.success) {
         toast.success(`Gestionnaire ${gestionnaireNom} supprimé`);
-        loadGestionnaires(); // Recharger la liste
+        loadGestionnaires();
       } else {
         toast.error(result.error || "Erreur lors de la suppression");
       }

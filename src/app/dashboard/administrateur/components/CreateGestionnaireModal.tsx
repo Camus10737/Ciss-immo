@@ -27,17 +27,10 @@ import {
 
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Immeuble } from "@/app/types";
-import { InvitationService } from '@/app/services/invitationService';
+import { CreateGestionnaireFormData } from "@/app/types/user-management";
 import { DataFilterService } from "@/app/services/dataFilterService";
-import { 
-  CreateGestionnaireFormData, 
-  Gestionnaire, 
-  ImmeublePermissions, 
-  LocataireUser, 
-  SuperAdmin, 
-  UserFilters 
-} from '@/app/types/user-management';
 import { UserManagementService } from "@/app/services/userManagementService";
+
 interface CreateGestionnaireModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -218,7 +211,7 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
                   id="phone"
                   value={formData.phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="+224 XXX XXX XXX"
+                  placeholder="+224 000 000 000"
                 />
               </div>
             </CardContent>

@@ -81,7 +81,7 @@ export function EditPermissionsModal({
       const updated = { ...prev };
       const immeublePermissions = { ...updated[immeubleId] };
       
-      // Gérer les permissions imbriquées (ex: comptabilite.read)
+      // Gérer les permissions imbriquées 
       if (path.includes('.')) {
         const [category, permission] = path.split('.');
         immeublePermissions[category as keyof ImmeublePermissions] = {
@@ -89,7 +89,7 @@ export function EditPermissionsModal({
           [permission]: value
         };
       } else {
-        // Permission simple (ex: delete_immeuble)
+        // Permission simple
         (immeublePermissions as any)[path] = value;
       }
       
@@ -321,7 +321,7 @@ export function EditPermissionsModal({
             })}
           </div>
 
-          {/* Avertissement si changements */}
+          {/* Avertissement EN CAS changements */}
           {hasChanges && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-start space-x-3">
