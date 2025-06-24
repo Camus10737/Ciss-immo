@@ -1,4 +1,3 @@
-// hooks/useAuthWithRole.ts
 import { useEffect, useState } from 'react';
 import {
   User,
@@ -11,20 +10,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Gestionnaire, LocataireUser, SuperAdmin, UserRole } from '@/app/types/user-management';
 
-// Type utilisateur étendu avec rôle
+// Type utilisateur étendu avec rôle et permissions
 export interface ExtendedUser {
-  // Données Firebase Auth
   uid: string;
   email: string | null;
   emailVerified: boolean;
-  
-  // Données Firestore
   role?: UserRole;
   name?: string;
   phone?: string;
   status?: 'active' | 'inactive' | 'pending';
-  
-  // Données spécifiques selon le rôle
+  immeubles_assignes?: string[];
+  permissions_supplementaires?: Record<string, any>;
   userData?: SuperAdmin | Gestionnaire | LocataireUser;
 }
 
@@ -36,10 +32,8 @@ export function useAuthWithRole() {
   const fetchUserData = async (firebaseUser: User): Promise<ExtendedUser> => {
     try {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        
         return {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -48,6 +42,8 @@ export function useAuthWithRole() {
           name: userData.name,
           phone: userData.phone,
           status: userData.status,
+          immeubles_assignes: userData.immeubles_assignes || [],
+          permissions_supplementaires: userData.permissions_supplementaires || {},
           userData: {
             id: userDoc.id,
             ...userData,
@@ -78,7 +74,6 @@ export function useAuthWithRole() {
     }
   };
 
-  // Écoute les changements d'état d'authentification
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -89,41 +84,32 @@ export function useAuthWithRole() {
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Fonction pour se connecter
+  // Auth functions
   const login = async (email: string, password: string) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Récupérer les données étendues immédiatement
       const extendedUser = await fetchUserData(result.user);
       setUser(extendedUser);
-      
       return { success: true, user: extendedUser };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   };
 
-  // Fonction pour s'inscrire
   const register = async (email: string, password: string) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // L'utilisateur sera créé dans Firestore via le processus d'invitation
       const extendedUser = await fetchUserData(result.user);
       setUser(extendedUser);
-      
       return { success: true, user: extendedUser };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   };
 
-  // Fonction pour se déconnecter
   const logout = async () => {
     try {
       await signOut(auth);
@@ -134,7 +120,6 @@ export function useAuthWithRole() {
     }
   };
 
-  // Fonction pour rafraîchir les données utilisateur
   const refreshUserData = async () => {
     if (auth.currentUser) {
       setLoading(true);
@@ -144,12 +129,27 @@ export function useAuthWithRole() {
     }
   };
 
-  // Fonctions utilitaires pour vérifier les permissions
+  // Helpers pour les rôles
   const isAdmin = () => user?.role === 'SUPER_ADMIN';
   const isGestionnaire = () => user?.role === 'GESTIONNAIRE';
   const isLocataire = () => user?.role === 'LOCATAIRE';
-  
   const hasRole = (role: UserRole) => user?.role === role;
+
+  // Helpers pour les permissions
+  const canAccessImmeuble = (immeubleId: string) =>
+    !!user?.immeubles_assignes?.includes(immeubleId);
+
+  const canAccessComptabilite = (immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.read;
+
+  const canWriteComptabilite = (immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.write;
+
+  const canAccessStatistiques = (immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.statistiques?.read;
+
+  const canDeleteImmeuble = (immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble;
 
   return {
     user,
@@ -158,11 +158,15 @@ export function useAuthWithRole() {
     register,
     logout,
     refreshUserData,
-    
-    // Fonctions utilitaires
     isAdmin,
     isGestionnaire,
     isLocataire,
-    hasRole
+    hasRole,
+    // Helpers permissions
+    canAccessImmeuble,
+    canAccessComptabilite,
+    canWriteComptabilite,
+    canAccessStatistiques,
+    canDeleteImmeuble
   };
 }

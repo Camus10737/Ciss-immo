@@ -1,8 +1,7 @@
-// src/app/dashboard/administrateur/components/AdminSection.tsx
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -13,26 +12,38 @@ import {
   Activity,
   RefreshCw,
   UserPlus,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 import { CreateGestionnaireModal } from "./CreateGestionnaireModal";
 import { GestionnairesList } from "./GestionnairesList";
 import { ActivityLogs } from "./ActivityLogs";
 import { PermissionsManager } from "./PermissionsManager";
+import { InvitationsList } from "./InvitationsList";
 
-type AdminTab = 'gestionnaires' | 'invitations' | 'permissions' | 'logs';
+type AdminTab = "gestionnaires" | "invitations" | "permissions" | "logs";
 
 export function AdminSection() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('gestionnaires');
+  const searchParams = useSearchParams();
+  const urlToken = searchParams.get("token");
+  const urlTab = searchParams.get("tab");
+
+  const [activeTab, setActiveTab] = useState<AdminTab>("gestionnaires");
   const [refreshKey, setRefreshKey] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Active automatiquement l'onglet invitations si un token est présent dans l'URL
+  useEffect(() => {
+    if (urlToken || urlTab === "invitations") {
+      setActiveTab("invitations");
+    }
+  }, [urlToken, urlTab]);
+
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    setRefreshKey((prev) => prev + 1);
   };
 
   const handleCreateSuccess = () => {
-    setRefreshKey(prev => prev + 1);
+    setRefreshKey((prev) => prev + 1);
   };
 
   return (
@@ -46,7 +57,9 @@ export function AdminSection() {
                 <Users size={20} className="text-white" />
               </div>
               <div>
-                <p className="text-sm text-blue-600 font-medium">Gestionnaires</p>
+                <p className="text-sm text-blue-600 font-medium">
+                  Gestionnaires
+                </p>
                 <p className="text-2xl font-bold text-blue-900">0</p>
               </div>
             </div>
@@ -60,7 +73,9 @@ export function AdminSection() {
                 <Mail size={20} className="text-white" />
               </div>
               <div>
-                <p className="text-sm text-orange-600 font-medium">Invitations</p>
+                <p className="text-sm text-orange-600 font-medium">
+                  Invitations
+                </p>
                 <p className="text-2xl font-bold text-orange-900">0</p>
               </div>
             </div>
@@ -120,17 +135,30 @@ export function AdminSection() {
         </CardHeader>
 
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AdminTab)} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as AdminTab)}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-4 mb-6">
-              <TabsTrigger value="gestionnaires" className="flex items-center space-x-2">
+              <TabsTrigger
+                value="gestionnaires"
+                className="flex items-center space-x-2"
+              >
                 <Users size={18} />
                 <span>Gestionnaires</span>
               </TabsTrigger>
-              <TabsTrigger value="invitations" className="flex items-center space-x-2">
+              <TabsTrigger
+                value="invitations"
+                className="flex items-center space-x-2"
+              >
                 <Mail size={18} />
                 <span>Invitations</span>
               </TabsTrigger>
-              <TabsTrigger value="permissions" className="flex items-center space-x-2">
+              <TabsTrigger
+                value="permissions"
+                className="flex items-center space-x-2"
+              >
                 <Shield size={18} />
                 <span>Permissions</span>
               </TabsTrigger>
@@ -142,7 +170,7 @@ export function AdminSection() {
 
             {/* Contenu des onglets */}
             <TabsContent value="gestionnaires" className="mt-0">
-              <GestionnairesList 
+              <GestionnairesList
                 onCreateClick={() => setShowCreateModal(true)}
                 refreshKey={refreshKey}
               />
@@ -153,15 +181,7 @@ export function AdminSection() {
                 <h3 className="text-lg font-semibold text-gray-900">
                   Invitations en cours
                 </h3>
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <Mail size={48} className="mx-auto text-gray-400 mb-4" />
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">
-                    Aucune invitation en cours
-                  </h4>
-                  <p className="text-gray-600">
-                    Les invitations envoyées apparaîtront ici
-                  </p>
-                </div>
+                <InvitationsList initialToken={urlToken || undefined} />
               </div>
             </TabsContent>
 
@@ -179,15 +199,27 @@ export function AdminSection() {
       {/* Footer avec informations */}
       <div className="bg-indigo-50 rounded-xl p-6 border border-indigo-100">
         <div className="flex items-start space-x-3">
-          <AlertCircle size={20} className="text-indigo-600 mt-0.5 flex-shrink-0" />
+          <AlertCircle
+            size={20}
+            className="text-indigo-600 mt-0.5 flex-shrink-0"
+          />
           <div>
             <h3 className="text-indigo-900 font-semibold mb-2">
               💡 Conseils d'administration
             </h3>
             <ul className="text-indigo-800 space-y-1 text-sm">
-              <li>• Assignez les gestionnaires aux immeubles spécifiques pour un contrôle précis</li>
-              <li>• Configurez les permissions par immeuble selon les responsabilités</li>
-              <li>• Consultez régulièrement l'historique pour surveiller l'activité</li>
+              <li>
+                • Assignez les gestionnaires aux immeubles spécifiques pour un
+                contrôle précis
+              </li>
+              <li>
+                • Configurez les permissions par immeuble selon les
+                responsabilités
+              </li>
+              <li>
+                • Consultez régulièrement l'historique pour surveiller
+                l'activité
+              </li>
               <li>• Renvoyez les invitations expirées si nécessaire</li>
             </ul>
           </div>

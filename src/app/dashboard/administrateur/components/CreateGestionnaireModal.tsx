@@ -1,9 +1,12 @@
-// src/app/dashboard/administrateur/components/CreateGestionnaireModal.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,38 +25,35 @@ import {
   Calculator,
   BarChart3,
   Trash2,
-  Loader2
+  Loader2,
 } from "lucide-react";
 
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Immeuble } from "@/app/types";
-import { InvitationService } from '@/app/services/invitationService';
 import { DataFilterService } from "@/app/services/dataFilterService";
-import { 
-  CreateGestionnaireFormData, 
-  Gestionnaire, 
-  ImmeublePermissions, 
-  LocataireUser, 
-  SuperAdmin, 
-  UserFilters 
-} from '@/app/types/user-management';
+import { CreateGestionnaireFormData } from "@/app/types/user-management";
 import { UserManagementService } from "@/app/services/userManagementService";
+
 interface CreateGestionnaireModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGestionnaireModalProps) {
+export function CreateGestionnaireModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: CreateGestionnaireModalProps) {
   const { user } = useAuthWithRole();
   const [loading, setLoading] = useState(false);
   const [immeubles, setImmeubles] = useState<Immeuble[]>([]);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    immeubles_assignes: [] as string[],
-    permissions_supplementaires: {} as any
+  const [formData, setFormData] = useState<CreateGestionnaireFormData>({
+    name: "",
+    email: "",
+    phone: "",
+    immeubles_assignes: [],
+    permissions_supplementaires: {},
   });
 
   // Charger les immeubles disponibles
@@ -71,19 +71,19 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
   useEffect(() => {
     if (isOpen) {
       setFormData({
-        name: '',
-        email: '',
-        phone: '',
+        name: "",
+        email: "",
+        phone: "",
         immeubles_assignes: [],
-        permissions_supplementaires: {}
+        permissions_supplementaires: {},
       });
     }
   }, [isOpen]);
 
   const handleImmeubleToggle = (immeubleId: string) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const newAssignments = prev.immeubles_assignes.includes(immeubleId)
-        ? prev.immeubles_assignes.filter(id => id !== immeubleId)
+        ? prev.immeubles_assignes.filter((id) => id !== immeubleId)
         : [...prev.immeubles_assignes, immeubleId];
 
       // Initialiser ou supprimer les permissions pour cet immeuble
@@ -92,7 +92,7 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
         newPermissions[immeubleId] = {
           comptabilite: { read: false, write: false, export: false },
           statistiques: { read: false, export: false },
-          delete_immeuble: false
+          delete_immeuble: false,
         };
       } else if (!newAssignments.includes(immeubleId)) {
         delete newPermissions[immeubleId];
@@ -101,32 +101,38 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
       return {
         ...prev,
         immeubles_assignes: newAssignments,
-        permissions_supplementaires: newPermissions
+        permissions_supplementaires: newPermissions,
       };
     });
   };
 
-  const handlePermissionChange = (immeubleId: string, category: string, permission: string, value: boolean) => {
-    setFormData(prev => ({
+  const handlePermissionChange = (
+    immeubleId: string,
+    category: string,
+    permission: string,
+    value: boolean
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       permissions_supplementaires: {
         ...prev.permissions_supplementaires,
         [immeubleId]: {
           ...prev.permissions_supplementaires[immeubleId],
-          [category]: category === 'delete_immeuble' 
-            ? value 
-            : {
-                ...prev.permissions_supplementaires[immeubleId][category],
-                [permission]: value
-              }
-        }
-      }
+          [category]:
+            category === "delete_immeuble"
+              ? value
+              : {
+                  ...prev.permissions_supplementaires[immeubleId][category],
+                  [permission]: value,
+                },
+        },
+      },
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user?.uid) {
       toast.error("Utilisateur non authentifié");
       return;
@@ -144,25 +150,50 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
 
     setLoading(true);
 
-    // 🐛 DEBUG
-    console.log('UserManagementService:', UserManagementService);
-    console.log('UserManagementService.createGestionnaire:', UserManagementService?.createGestionnaire);
-
     try {
       const result = await UserManagementService.createGestionnaire(
         user.uid,
-        formData as CreateGestionnaireFormData
+        formData
       );
 
       if (result.success) {
-        toast.success(`Gestionnaire ${formData.name} créé avec succès. Une invitation a été envoyée.`);
+        // Vérifie que le token existe
+        const token = result.gestionnaire?.token;
+        if (!token) {
+          toast.error("Le token d'invitation est manquant.");
+          setLoading(false);
+          return;
+        }
+
+        // Envoi de l'email d'invitation via l'API route
+        const emailRes = await fetch("/api/send-invitation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            token, // <-- juste le token, pas d'URL ici
+            role: "GESTIONNAIRE",
+          }),
+        });
+
+        const emailData = await emailRes.json();
+        console.log("Réponse API send-invitation :", emailData);
+
+        if (!emailRes.ok) {
+          toast.error("Erreur lors de l'envoi de l'email d'invitation.");
+          setLoading(false);
+          return;
+        }
+
+        toast.success(
+          `Gestionnaire ${formData.name} créé avec succès. Une invitation a été envoyée.`
+        );
         onSuccess();
         onClose();
       } else {
         toast.error(result.error || "Erreur lors de la création");
       }
     } catch (error) {
-      console.error('Erreur création gestionnaire:', error);
       toast.error("Une erreur inattendue s'est produite");
     } finally {
       setLoading(false);
@@ -195,7 +226,9 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, name: e.target.value }))
+                    }
                     placeholder="Ex: Ahmed Diallo"
                     required
                   />
@@ -206,7 +239,12 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
                     placeholder="ahmed@example.com"
                     required
                   />
@@ -217,7 +255,9 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
                 <Input
                   id="phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, phone: e.target.value }))
+                  }
                   placeholder="+224 XXX XXX XXX"
                 />
               </div>
@@ -241,66 +281,120 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
               ) : (
                 <div className="space-y-4">
                   {immeubles.map((immeuble) => (
-                    <Card key={immeuble.id} className="border-2 border-gray-100">
+                    <Card
+                      key={immeuble.id}
+                      className="border-2 border-gray-100"
+                    >
                       <CardContent className="p-4">
                         <div className="flex items-start space-x-4">
                           <Checkbox
-                            checked={formData.immeubles_assignes.includes(immeuble.id)}
-                            onCheckedChange={() => handleImmeubleToggle(immeuble.id)}
+                            checked={formData.immeubles_assignes.includes(
+                              immeuble.id
+                            )}
+                            onCheckedChange={() =>
+                              handleImmeubleToggle(immeuble.id)
+                            }
                             className="mt-1"
                           />
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-3">
                               <div>
-                                <h4 className="font-semibold text-gray-900">{immeuble.nom}</h4>
+                                <h4 className="font-semibold text-gray-900">
+                                  {immeuble.nom}
+                                </h4>
                                 <p className="text-sm text-gray-600">
-                                  {immeuble.quartier}, {immeuble.ville} • {immeuble.nombreAppartements} appartements
+                                  {immeuble.quartier}, {immeuble.ville} •{" "}
+                                  {immeuble.nombreAppartements} appartements
                                 </p>
                               </div>
                               <Badge variant="outline">{immeuble.type}</Badge>
                             </div>
 
                             {/* Permissions pour cet immeuble */}
-                            {formData.immeubles_assignes.includes(immeuble.id) && (
+                            {formData.immeubles_assignes.includes(
+                              immeuble.id
+                            ) && (
                               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                                 <h5 className="font-medium text-gray-900 mb-3 flex items-center">
-                                  <Shield size={16} className="mr-2 text-indigo-600" />
+                                  <Shield
+                                    size={16}
+                                    className="mr-2 text-indigo-600"
+                                  />
                                   Permissions spéciales
                                 </h5>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {/* Comptabilité */}
                                   <div>
                                     <div className="flex items-center space-x-2 mb-2">
-                                      <Calculator size={16} className="text-green-600" />
-                                      <span className="font-medium text-sm">Comptabilité</span>
+                                      <Calculator
+                                        size={16}
+                                        className="text-green-600"
+                                      />
+                                      <span className="font-medium text-sm">
+                                        Comptabilité
+                                      </span>
                                     </div>
                                     <div className="space-y-2 ml-6">
                                       <label className="flex items-center space-x-2">
                                         <Checkbox
-                                          checked={formData.permissions_supplementaires[immeuble.id]?.comptabilite?.read || false}
-                                          onCheckedChange={(checked) => 
-                                            handlePermissionChange(immeuble.id, 'comptabilite', 'read', !!checked)
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.comptabilite?.read || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "comptabilite",
+                                              "read",
+                                              !!checked
+                                            )
                                           }
                                         />
                                         <span className="text-sm">Voir</span>
                                       </label>
                                       <label className="flex items-center space-x-2">
                                         <Checkbox
-                                          checked={formData.permissions_supplementaires[immeuble.id]?.comptabilite?.write || false}
-                                          onCheckedChange={(checked) => 
-                                            handlePermissionChange(immeuble.id, 'comptabilite', 'write', !!checked)
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.comptabilite?.write || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "comptabilite",
+                                              "write",
+                                              !!checked
+                                            )
                                           }
                                         />
-                                        <span className="text-sm">Modifier</span>
+                                        <span className="text-sm">
+                                          Modifier
+                                        </span>
                                       </label>
                                       <label className="flex items-center space-x-2">
                                         <Checkbox
-                                          checked={formData.permissions_supplementaires[immeuble.id]?.comptabilite?.export || false}
-                                          onCheckedChange={(checked) => 
-                                            handlePermissionChange(immeuble.id, 'comptabilite', 'export', !!checked)
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.comptabilite?.export || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "comptabilite",
+                                              "export",
+                                              !!checked
+                                            )
                                           }
                                         />
-                                        <span className="text-sm">Exporter</span>
+                                        <span className="text-sm">
+                                          Exporter
+                                        </span>
                                       </label>
                                     </div>
                                   </div>
@@ -308,27 +402,54 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
                                   {/* Statistiques */}
                                   <div>
                                     <div className="flex items-center space-x-2 mb-2">
-                                      <BarChart3 size={16} className="text-blue-600" />
-                                      <span className="font-medium text-sm">Statistiques</span>
+                                      <BarChart3
+                                        size={16}
+                                        className="text-blue-600"
+                                      />
+                                      <span className="font-medium text-sm">
+                                        Statistiques
+                                      </span>
                                     </div>
                                     <div className="space-y-2 ml-6">
                                       <label className="flex items-center space-x-2">
                                         <Checkbox
-                                          checked={formData.permissions_supplementaires[immeuble.id]?.statistiques?.read || false}
-                                          onCheckedChange={(checked) => 
-                                            handlePermissionChange(immeuble.id, 'statistiques', 'read', !!checked)
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.statistiques?.read || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "statistiques",
+                                              "read",
+                                              !!checked
+                                            )
                                           }
                                         />
                                         <span className="text-sm">Voir</span>
                                       </label>
                                       <label className="flex items-center space-x-2">
                                         <Checkbox
-                                          checked={formData.permissions_supplementaires[immeuble.id]?.statistiques?.export || false}
-                                          onCheckedChange={(checked) => 
-                                            handlePermissionChange(immeuble.id, 'statistiques', 'export', !!checked)
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.statistiques?.export || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "statistiques",
+                                              "export",
+                                              !!checked
+                                            )
                                           }
                                         />
-                                        <span className="text-sm">Exporter</span>
+                                        <span className="text-sm">
+                                          Exporter
+                                        </span>
                                       </label>
                                     </div>
                                   </div>
@@ -338,9 +459,18 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
                                 <Separator className="my-3" />
                                 <label className="flex items-center space-x-2">
                                   <Checkbox
-                                    checked={formData.permissions_supplementaires[immeuble.id]?.delete_immeuble || false}
-                                    onCheckedChange={(checked) => 
-                                      handlePermissionChange(immeuble.id, 'delete_immeuble', '', !!checked)
+                                    checked={
+                                      formData.permissions_supplementaires[
+                                        immeuble.id
+                                      ]?.delete_immeuble || false
+                                    }
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionChange(
+                                        immeuble.id,
+                                        "delete_immeuble",
+                                        "",
+                                        !!checked
+                                      )
                                     }
                                   />
                                   <Trash2 size={16} className="text-red-600" />
@@ -362,10 +492,19 @@ export function CreateGestionnaireModal({ isOpen, onClose, onSuccess }: CreateGe
 
           {/* Actions */}
           <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
               Annuler
             </Button>
-            <Button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-700">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
               {loading ? (
                 <>
                   <Loader2 size={16} className="mr-2 animate-spin" />

@@ -1,5 +1,3 @@
-// src/services/userManagementService.ts
-
 import {
   collection,
   doc,
@@ -22,15 +20,13 @@ import {
   SuperAdmin, 
   UserFilters 
 } from '@/app/types/user-management';
+import { InvitationService } from "@/app/services/invitationService";
 
 /**
  GESTION DES UTILISATEURS
  */
 export class UserManagementService {
 
-  /**
-    Récupérer un utilisateur par ID
-   */
   static async getUserById(userId: string): Promise<SuperAdmin | Gestionnaire | LocataireUser | null> {
     try {
       const userDoc = await getDoc(doc(db, 'users', userId));
@@ -49,17 +45,12 @@ export class UserManagementService {
       } as SuperAdmin | Gestionnaire | LocataireUser;
 
     } catch (error) {
-      console.error('Erreur récupération utilisateur:', error);
       return null;
     }
   }
 
-  /**
-    Récupérer tous les gestionnaires
-   */
   static async getGestionnaires(filters?: UserFilters): Promise<Gestionnaire[]> {
     try {
-      // Requête simplifiée sans orderBy pour éviter l'erreur d'index
       let q = query(
         collection(db, 'users'),
         where('role', '==', 'GESTIONNAIRE')
@@ -82,30 +73,27 @@ export class UserManagementService {
         } as Gestionnaire;
       });
 
-      // Trier côté client par date de création (décroissant)
       return gestionnaires.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     } catch (error) {
-      console.error('Erreur récupération gestionnaires:', error);
       return [];
     }
   }
 
-  /**
-   Créer un gestionnaire
-   */
-  static async createGestionnaire(
+    static async createGestionnaire(
     superAdminId: string, 
     formData: CreateGestionnaireFormData
   ): Promise<{ success: boolean; gestionnaire?: Gestionnaire; error?: string }> {
     try {
-      //  Vérifier que l'email n'existe pas déjà
       const existingUser = await this.getUserByEmail(formData.email);
       if (existingUser) {
         return { success: false, error: 'Un utilisateur avec cet email existe déjà' };
       }
-
-      //  Créer l'invitation en base
+  
+      // Génère le token UNE SEULE FOIS
+      const token = this.generateSecureToken();
+  
+      // Créer l'invitation en base avec ce token
       const invitationData = {
         email: formData.email,
         role: 'GESTIONNAIRE' as const,
@@ -118,13 +106,12 @@ export class UserManagementService {
         invitedBy: superAdminId,
         invitedAt: serverTimestamp(),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
-        token: this.generateSecureToken()
+        token // <-- même token partout
       };
-
+  
       await addDoc(collection(db, 'invitations'), invitationData);
-      console.log('✅ Invitation créée en base pour:', formData.email);
-
-      // Créer le gestionnaire (statut pending)
+  
+      // Créer le gestionnaire (statut pending) avec le même token
       const gestionnaireData: Omit<Gestionnaire, 'id'> = {
         email: formData.email,
         role: 'GESTIONNAIRE',
@@ -136,20 +123,19 @@ export class UserManagementService {
         invitedBy: superAdminId,
         invitedAt: new Date(),
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        token // <-- ajoute le token ici aussi
       };
-
+  
       const docRef = await addDoc(collection(db, 'users'), {
         ...gestionnaireData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         invitedAt: serverTimestamp()
       });
-
-      //  Assigner les immeubles au gestionnaire
+  
       await this.assignImmeubles(formData.immeubles_assignes, docRef.id);
-
-      //  Créer le log d'activité
+  
       const performer = await this.getUserById(superAdminId);
       const logData = {
         action: 'USER_CREATED' as const,
@@ -164,26 +150,23 @@ export class UserManagementService {
         },
         timestamp: serverTimestamp()
       };
-
+  
       await addDoc(collection(db, 'activity_logs'), logData);
-      console.log('✅ Log créé pour:', docRef.id);
-
+  
       const gestionnaire: Gestionnaire = {
         id: docRef.id,
-        ...gestionnaireData
+        ...gestionnaireData,
+        // token déjà inclus dans gestionnaireData
       };
-
+  
       return { success: true, gestionnaire };
-
+  
     } catch (error) {
-      console.error('Erreur création gestionnaire:', error);
+      console.error("Erreur réelle lors de la création du gestionnaire :", error);
       return { success: false, error: 'Erreur lors de la création du gestionnaire' };
     }
   }
 
-  /**
-   Mettre à jour un gestionnaire
-   */
   static async updateGestionnaire(
     gestionnaireId: string,
     updates: Partial<CreateGestionnaireFormData>,
@@ -192,32 +175,25 @@ export class UserManagementService {
     try {
       const gestionnaireRef = doc(db, 'users', gestionnaireId);
 
-      //  Préparer les données de mise à jour
       const updateData: any = {
         ...updates,
         updatedAt: serverTimestamp()
       };
 
-      // Si on met à jour les permissions, les traiter correctement
       if (updates.permissions_supplementaires) {
         updateData.permissions_supplementaires = this.buildCompletePermissions(updates.permissions_supplementaires);
       }
 
       await updateDoc(gestionnaireRef, updateData);
 
-      // Si les immeubles ont changé, mettre à jour les assignations
       if (updates.immeubles_assignes) {
-        // Récupérer l'ancien gestionnaire pour comparison
         const oldGestionnaire = await this.getUserById(gestionnaireId) as Gestionnaire;
         if (oldGestionnaire) {
-          // Désassigner les anciens immeubles
           await this.unassignImmeubles(oldGestionnaire.immeubles_assignes, gestionnaireId);
-          // Assigner les nouveaux
           await this.assignImmeubles(updates.immeubles_assignes, gestionnaireId);
         }
       }
 
-      // 3. Logger l'action de mise à jour
       const performer = await this.getUserById(performedBy);
       const logData = {
         action: 'USER_UPDATED' as const,
@@ -231,19 +207,14 @@ export class UserManagementService {
       };
 
       await addDoc(collection(db, 'activity_logs'), logData);
-      console.log('✅ Log update créé pour:', gestionnaireId);
 
       return { success: true };
 
     } catch (error) {
-      console.error('Erreur mise à jour gestionnaire:', error);
       return { success: false, error: 'Erreur lors de la mise à jour' };
     }
   }
 
-  /**
-    Mettre à jour uniquement les permissions d'un gestionnaire
-   */
   static async updateGestionnairePermissions(
     gestionnaireId: string,
     newPermissions: { [immeubleId: string]: any },
@@ -252,22 +223,18 @@ export class UserManagementService {
     try {
       const gestionnaireRef = doc(db, 'users', gestionnaireId);
 
-      //  Récupérer le gestionnaire actuel pour comparaison
       const currentGestionnaire = await this.getUserById(gestionnaireId) as Gestionnaire;
       if (!currentGestionnaire) {
         return { success: false, error: 'Gestionnaire introuvable' };
       }
 
-      // Construire les permissions complètes avec les automatiques
       const completePermissions = this.buildCompletePermissions(newPermissions);
 
-      //  Mettre à jour en base
       await updateDoc(gestionnaireRef, {
         permissions_supplementaires: completePermissions,
         updatedAt: serverTimestamp()
       });
 
-      //  Logger l'action de mise à jour des permissions
       const performer = await this.getUserById(performedBy);
       const logData = {
         action: 'PERMISSIONS_UPDATED' as const,
@@ -283,37 +250,28 @@ export class UserManagementService {
       };
 
       await addDoc(collection(db, 'activity_logs'), logData);
-      console.log('✅ Log permissions update créé pour:', gestionnaireId);
 
       return { success: true };
 
     } catch (error) {
-      console.error('Erreur mise à jour permissions:', error);
       return { success: false, error: 'Erreur lors de la mise à jour des permissions' };
     }
   }
 
-  /**
-   Supprimer un gestionnaire
-   */
   static async deleteGestionnaire(
     gestionnaireId: string,
     performedBy: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      //Récupérer le gestionnaire
       const gestionnaire = await this.getUserById(gestionnaireId) as Gestionnaire;
       if (!gestionnaire) {
         return { success: false, error: 'Gestionnaire introuvable' };
       }
 
-      //  Désassigner tous ses immeubles
       await this.unassignImmeubles(gestionnaire.immeubles_assignes, gestionnaireId);
 
-      // Supprimer l'utilisateur
       await deleteDoc(doc(db, 'users', gestionnaireId));
 
-      // Logger l'action de suppression
       const performer = await this.getUserById(performedBy);
       const logData = {
         action: 'USER_DELETED' as const,
@@ -330,19 +288,14 @@ export class UserManagementService {
       };
 
       await addDoc(collection(db, 'activity_logs'), logData);
-      console.log('✅ Log delete créé pour:', gestionnaireId);
 
       return { success: true };
 
     } catch (error) {
-      console.error('Erreur suppression gestionnaire:', error);
       return { success: false, error: 'Erreur lors de la suppression' };
     }
   }
 
-  /**
-   Assigner des immeubles à un gestionnaire
-   */
   private static async assignImmeubles(immeubleIds: string[], gestionnaireId: string): Promise<void> {
     const batch = writeBatch(db);
 
@@ -357,9 +310,6 @@ export class UserManagementService {
     await batch.commit();
   }
 
-  /**
-   Désassigner des immeubles d'un gestionnaire
-   */
   private static async unassignImmeubles(immeubleIds: string[], gestionnaireId: string): Promise<void> {
     const batch = writeBatch(db);
 
@@ -374,9 +324,6 @@ export class UserManagementService {
     await batch.commit();
   }
 
-  /**
-    Récupérer utilisateur par email
-   */
   private static async getUserByEmail(email: string): Promise<any | null> {
     try {
       const q = query(
@@ -391,14 +338,10 @@ export class UserManagementService {
       return { id: docSnap.id, ...docSnap.data() };
 
     } catch (error) {
-      console.error('Erreur recherche par email:', error);
       return null;
     }
   }
 
-  /**
-    Activer/Désactiver un gestionnaire
-   */
   static async toggleGestionnaireStatus(
     gestionnaireId: string,
     status: 'active' | 'inactive',
@@ -410,7 +353,6 @@ export class UserManagementService {
         updatedAt: serverTimestamp()
       });
 
-      // Logger l'action de changement de statut
       const performer = await this.getUserById(performedBy);
       const logData = {
         action: status === 'active' ? 'USER_ACTIVATED' as const : 'USER_DEACTIVATED' as const,
@@ -425,19 +367,14 @@ export class UserManagementService {
       };
 
       await addDoc(collection(db, 'activity_logs'), logData);
-      console.log('✅ Log status change créé pour:', gestionnaireId);
 
       return { success: true };
 
     } catch (error) {
-      console.error('Erreur changement statut:', error);
       return { success: false, error: 'Erreur lors du changement de statut' };
     }
   }
 
-  /**
-    Construire les permissions complètes avec les permissions automatiques
-   */
   private static buildCompletePermissions(
     formPermissions: CreateGestionnaireFormData['permissions_supplementaires']
   ): { [immeubleId: string]: ImmeublePermissions } {
@@ -445,11 +382,8 @@ export class UserManagementService {
 
     for (const [immeubleId, permissions] of Object.entries(formPermissions)) {
       completePermissions[immeubleId] = {
-        // Permissions automatiques 
         gestion_immeuble: { read: true, write: true },
         gestion_locataires: { read: true, write: true },
-        
-        // Permissions manuelles 
         comptabilite: permissions.comptabilite,
         statistiques: permissions.statistiques,
         delete_immeuble: permissions.delete_immeuble
@@ -459,9 +393,6 @@ export class UserManagementService {
     return completePermissions;
   }
 
-  /**
-    Générer un token sécurisé pour les invitations
-   */
   private static generateSecureToken(): string {
     return Math.random().toString(36).substring(2, 15) + 
            Math.random().toString(36).substring(2, 15) +
