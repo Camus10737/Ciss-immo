@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   User,
   onAuthStateChanged,
@@ -10,7 +10,6 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Gestionnaire, LocataireUser, SuperAdmin, UserRole } from '@/app/types/user-management';
 
-// Type utilisateur étendu avec rôle et permissions
 export interface ExtendedUser {
   uid: string;
   email: string | null;
@@ -34,6 +33,8 @@ export function useAuthWithRole() {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        // Debug temporaire
+        console.log("Firestore userDoc:", userData);
         return {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -49,11 +50,13 @@ export function useAuthWithRole() {
             ...userData,
             createdAt: userData.createdAt?.toDate() || new Date(),
             updatedAt: userData.updatedAt?.toDate() || new Date(),
-            invitedAt: userData.invitedAt?.toDate(),
-            lastLogin: userData.lastLogin?.toDate()
+            invitedAt: userData.invitedAt?.toDate?.() || undefined,
+            lastLogin: userData.lastLogin?.toDate?.() || undefined
           } as SuperAdmin | Gestionnaire | LocataireUser
         };
       } else {
+        // Debug temporaire
+        console.warn("Aucun document Firestore trouvé pour l'utilisateur", firebaseUser.uid);
         // Utilisateur Firebase Auth mais pas dans Firestore
         return {
           uid: firebaseUser.uid,
@@ -76,6 +79,7 @@ export function useAuthWithRole() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
       if (firebaseUser) {
         const extendedUser = await fetchUserData(firebaseUser);
         setUser(extendedUser);
@@ -85,6 +89,7 @@ export function useAuthWithRole() {
       setLoading(false);
     });
     return () => unsubscribe();
+    // eslint-disable-next-line
   }, []);
 
   // Auth functions
@@ -130,26 +135,28 @@ export function useAuthWithRole() {
   };
 
   // Helpers pour les rôles
-  const isAdmin = () => user?.role === 'SUPER_ADMIN';
-  const isGestionnaire = () => user?.role === 'GESTIONNAIRE';
-  const isLocataire = () => user?.role === 'LOCATAIRE';
-  const hasRole = (role: UserRole) => user?.role === role;
+  const isAdmin = useCallback(() => user?.role === 'SUPER_ADMIN', [user]);
+  const isGestionnaire = useCallback(() => user?.role === 'GESTIONNAIRE', [user]);
+  const isLocataire = useCallback(() => user?.role === 'LOCATAIRE', [user]);
+  const hasRole = useCallback((role: UserRole) => user?.role === role, [user]);
 
-  // Helpers pour les permissions
-  const canAccessImmeuble = (immeubleId: string) =>
-    !!user?.immeubles_assignes?.includes(immeubleId);
+  // Helpers pour les permissions (mémorisés !)
+  const canAccessImmeuble = useCallback((immeubleId: string) => {
+    if (user?.role === 'SUPER_ADMIN') return true;
+    return !!user?.immeubles_assignes?.includes(immeubleId);
+  }, [user]);
 
-  const canAccessComptabilite = (immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.read;
+  const canAccessComptabilite = useCallback((immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.read, [user]);
 
-  const canWriteComptabilite = (immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.write;
+  const canWriteComptabilite = useCallback((immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.write, [user]);
 
-  const canAccessStatistiques = (immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.statistiques?.read;
+  const canAccessStatistiques = useCallback((immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.statistiques?.read, [user]);
 
-  const canDeleteImmeuble = (immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble;
+  const canDeleteImmeuble = useCallback((immeubleId: string) =>
+    !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble, [user]);
 
   return {
     user,

@@ -7,6 +7,7 @@ import { getLocataireById } from "@/app/services/locatairesService";
 import { Button } from "@/components/ui/button";
 import { RecuPaiement } from "@/app/types/recus";
 import { Eye, CheckCircle2, XCircle } from "lucide-react";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole"; // Ajout
 
 // Utilitaire pour obtenir les mois déjà payés pour un client
 function getPaidMonthsForClient(clientId: string, operations: any[]) {
@@ -80,11 +81,11 @@ export function ValidationRecusAdmin() {
   const [duplicateOperation, setDuplicateOperation] = useState<any | null>(
     null
   );
-
-  // Pour la sélection des mois à valider
   const [selectedMonths, setSelectedMonths] = useState<
     { year: number; month: number }[]
   >([]);
+
+  const { canWriteComptabilite } = useAuthWithRole(); // Ajout
 
   const fetchRecus = async () => {
     setLoading(true);
@@ -138,7 +139,6 @@ export function ValidationRecusAdmin() {
     // eslint-disable-next-line
   }, []);
 
-  // Ouvre la modale de validation et pré-remplit les champs
   const openValidationModal = (recu: RecuPaiement) => {
     setValidationModal(recu);
     setMontant("");
@@ -147,28 +147,23 @@ export function ValidationRecusAdmin() {
     setSelectedMonths([]);
   };
 
-  // Met à jour la sélection des mois si le nombre de mois change
   useEffect(() => {
     setSelectedMonths([]);
   }, [mois, validationModal]);
 
-  // Génère la liste des mois sélectionnables à partir du dernier mois payé
   function getSelectableMonths(clientId: string) {
     const now = new Date();
     const paidMonths = getPaidMonthsForClient(clientId, operations);
     const lastPaid = getLastPaidMonth(clientId, operations);
 
-    // Commence à partir du mois suivant le dernier payé
     let year = lastPaid.year || now.getFullYear();
-    let month = lastPaid.month || 0; // 0 = pas de mois payé, donc commence à janvier
+    let month = lastPaid.month || 0;
 
-    // Si aucun mois payé, commence à ce mois-ci
     if (!lastPaid.year && !lastPaid.month) {
       year = now.getFullYear();
       month = now.getMonth();
     }
 
-    // Génère les 24 prochains mois (pour gérer les paiements en avance)
     const months: { year: number; month: number }[] = [];
     let count = 0;
     let y = year;
@@ -185,66 +180,65 @@ export function ValidationRecusAdmin() {
     return months;
   }
 
-  // Validation avec contrôle du nombre de mois et doublon
   const handleValidation = async (force = false) => {
-  if (!validationModal) return;
+    if (!validationModal) return;
 
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1;
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
 
-  await fetchOperations(); // recharge la liste complète
-  const montantNumber = Number(montant);
+    await fetchOperations();
+    const montantNumber = Number(montant);
 
-  const duplicateCandidates = operations.filter((op) => {
-    if (op.type !== "Ressource") return false;
-    if ((op.client || "").trim() !== validationModal.locataireId.trim()) return false;
-    if (Number(op.montant) !== montantNumber) return false;
+    const duplicateCandidates = operations.filter((op) => {
+      if (op.type !== "Ressource") return false;
+      if ((op.client || "").trim() !== validationModal.locataireId.trim()) return false;
+      if (Number(op.montant) !== montantNumber) return false;
 
-    const moisList: { year: number; month: number }[] = [];
+      const moisList: { year: number; month: number }[] = [];
 
-    if (Array.isArray(op.moisArray)) {
-      moisList.push(...op.moisArray);
-    } else if (Array.isArray(op.mois)) {
-      const y = new Date(op.date).getFullYear();
-      moisList.push(...op.mois.map((m: number) => ({ year: y, month: m })));
-    } else if (typeof op.mois === "number") {
-      const y = new Date(op.date).getFullYear();
-      moisList.push({ year: y, month: op.mois });
+      if (Array.isArray(op.moisArray)) {
+        moisList.push(...op.moisArray);
+      } else if (Array.isArray(op.mois)) {
+        const y = new Date(op.date).getFullYear();
+        moisList.push(...op.mois.map((m: number) => ({ year: y, month: m })));
+      } else if (typeof op.mois === "number") {
+        const y = new Date(op.date).getFullYear();
+        moisList.push({ year: y, month: op.mois });
+      }
+
+      return moisList.some(
+        (m) => m.year === currentYear && m.month === currentMonth
+      );
+    });
+
+    const duplicate = duplicateCandidates
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    if (duplicate && !force) {
+      setDuplicateOperation(duplicate);
+      setShowDuplicateModal(true);
+      return;
     }
 
-    return moisList.some(
-      (m) => m.year === currentYear && m.month === currentMonth
+    setLoading(true);
+
+    await recuService.validerRecu(
+      validationModal.id,
+      description,
+      montantNumber,
+      mois,
+      selectedMonths
     );
-  });
 
-  const duplicate = duplicateCandidates
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    setValidationModal(null);
+    await fetchRecus();
+    await fetchOperations();
+    setShowDuplicateModal(false);
+    setDuplicateOperation(null);
+    setLoading(false);
+  };
 
-  if (duplicate && !force) {
-    setDuplicateOperation(duplicate);
-    setShowDuplicateModal(true);
-    return;
-  }
-
-  setLoading(true);
-
-  await recuService.validerRecu(
-    validationModal.id,
-    description,
-    montantNumber,
-    mois,
-    selectedMonths
-  );
-
-  setValidationModal(null);
-  await fetchRecus();
-  await fetchOperations();
-  setShowDuplicateModal(false);
-  setDuplicateOperation(null);
-  setLoading(false);
-};
-  // Refus classique
   const handleRefus = async (id: string) => {
     setLoading(true);
     await recuService.refuserRecu(id, "Reçu refusé par l'administrateur.");
@@ -252,7 +246,6 @@ export function ValidationRecusAdmin() {
     setLoading(false);
   };
 
-  // Prépare la nouvelle ligne proposée pour l'affichage dans la modale
   const montantNumber = Number(montant);
   const newOperation = validationModal && {
     type: "Ressource",
@@ -290,22 +283,27 @@ export function ValidationRecusAdmin() {
                   <Eye size={16} className="mr-1" />
                   Voir
                 </Button>
-                <Button
-                  onClick={() => openValidationModal(recu)}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  title="Valider"
-                >
-                  <CheckCircle2 size={16} className="mr-1" />
-                  Valider
-                </Button>
-                <Button
-                  onClick={() => handleRefus(recu.id)}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                  title="Refuser"
-                >
-                  <XCircle size={16} className="mr-1" />
-                  Refuser
-                </Button>
+                {/* Contrôle de permission ici */}
+                {canWriteComptabilite(recu.immeubleId) && (
+                  <>
+                    <Button
+                      onClick={() => openValidationModal(recu)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      title="Valider"
+                    >
+                      <CheckCircle2 size={16} className="mr-1" />
+                      Valider
+                    </Button>
+                    <Button
+                      onClick={() => handleRefus(recu.id)}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                      title="Refuser"
+                    >
+                      <XCircle size={16} className="mr-1" />
+                      Refuser
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </li>

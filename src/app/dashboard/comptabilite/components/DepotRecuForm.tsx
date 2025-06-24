@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { recuService } from "@/app/services/recusService";
 import { Button } from "@/components/ui/button";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 interface Locataire {
   id: string;
   nom: string;
   prenom: string;
   appartementId: string;
-  immeubleId: string; // <-- ajoute ce champ
+  immeubleId: string;
 }
 
 interface Immeuble {
@@ -30,6 +31,8 @@ export function DepotRecuForm({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  const { canWriteComptabilite } = useAuthWithRole();
+
   // Filtre les locataires selon l'immeuble sélectionné
   const filteredLocataires = selectedImmeuble
     ? locataires.filter((l) => l.immeubleId === selectedImmeuble)
@@ -41,6 +44,10 @@ export function DepotRecuForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWriteComptabilite(selectedImmeuble)) {
+      setMessage("Vous n'avez pas la permission d'envoyer un reçu pour cet immeuble.");
+      return;
+    }
     if (!selectedLocataireObj) {
       setMessage("Veuillez sélectionner un locataire.");
       return;
@@ -72,7 +79,7 @@ export function DepotRecuForm({
         selectedLocataireObj.appartementId,
         moisPayes,
         fichierUrl,
-        selectedImmeuble // <-- Ajoute l'immeuble sélectionné ici
+        selectedImmeuble
       );
 
       setMessage("Reçu envoyé avec succès !");
@@ -88,6 +95,15 @@ export function DepotRecuForm({
 
   if (immeubles.length === 0) {
     return <div className="text-gray-500">Aucun immeuble disponible.</div>;
+  }
+
+  // Si pas la permission, affiche un message et rien d'autre
+  if (selectedImmeuble && !canWriteComptabilite(selectedImmeuble)) {
+    return (
+      <div className="text-red-600 text-center font-semibold p-4">
+        Vous n'avez pas la permission d'envoyer un reçu pour cet immeuble.
+      </div>
+    );
   }
 
   return (

@@ -3,18 +3,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ArrowLeft, Save, X, Building2, MapPin, User } from "lucide-react";
 import { Immeuble, ImmeubleFormData } from "@/app/types";
 import { immeublesService } from "@/app/services/immeublesService";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole"; // AJOUT
 
 interface BuildingFormProps {
   immeuble?: Immeuble | null;
@@ -42,6 +33,17 @@ export function BuildingForm({
       telephone: "",
     },
   });
+
+  const { isGestionnaire } = useAuthWithRole(); // AJOUT
+
+  // 🔒 Bloque l'accès au formulaire pour les gestionnaires
+  if (isGestionnaire()) {
+    return (
+      <div className="text-red-600 text-center font-semibold p-8">
+        Vous n'avez pas la permission d’ajouter ou modifier un immeuble.
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (editMode && immeuble) {
@@ -80,29 +82,30 @@ export function BuildingForm({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (editMode && immeuble) {
-    // Modification
-    await immeublesService.modifierImmeuble(immeuble.id, {
-      nom: formData.nom,
-      pays: formData.pays,
-      ville: formData.ville,
-      quartier: formData.quartier,
-      type: formData.type,
-      nombreAppartements: formData.nombreAppartements,
-      proprietaire: formData.proprietaire,
-    });
-  } else {
-    // Création
-    await immeublesService.creerImmeuble(formData);
-  }
-  if (onSuccess) onSuccess();
-};
+    e.preventDefault();
+    if (editMode && immeuble) {
+      // Modification
+      await immeublesService.modifierImmeuble(immeuble.id, {
+        nom: formData.nom,
+        pays: formData.pays,
+        ville: formData.ville,
+        quartier: formData.quartier,
+        type: formData.type,
+        nombreAppartements: formData.nombreAppartements,
+        proprietaire: formData.proprietaire,
+      });
+    } else {
+      // Création
+      await immeublesService.creerImmeuble(formData);
+    }
+    if (onSuccess) onSuccess();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       <div className="container mx-auto px-4 py-8 space-y-8">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* ...le reste de ton formulaire inchangé... */}
           {/* Informations générales */}
           <Card className="bg-white border-0 shadow-sm">
             <CardHeader className="pb-4">

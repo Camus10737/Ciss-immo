@@ -3,10 +3,13 @@ import { useEffect, useState } from "react";
 import { getRapportsAnnuels, deleteRapportAnnuel } from "@/app/services/rapportService";
 import { RapportAnnuel } from "./RapportAnnuel";
 import { Trash2 } from "lucide-react";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 export function ListeRapportsFinanciers({ refresh, immeubles }: { refresh: number; immeubles: any[] }) {
   const [rapports, setRapports] = useState<any[]>([]);
   const [selectedRapport, setSelectedRapport] = useState<any | null>(null);
+
+  const { canDeleteImmeuble } = useAuthWithRole();
 
   const refreshList = () => getRapportsAnnuels().then(setRapports);
 
@@ -49,13 +52,15 @@ export function ListeRapportsFinanciers({ refresh, immeubles }: { refresh: numbe
                 {r.date ? new Date(r.date).toLocaleDateString() : ""}
               </span>
             </span>
-            <button
-              className="ml-4 text-red-600 opacity-0 group-hover:opacity-100 transition"
-              title="Supprimer"
-              onClick={() => handleDelete(r.id)}
-            >
-              <Trash2 size={18} />
-            </button>
+            {r.immeubleId && canDeleteImmeuble(r.immeubleId) && (
+              <button
+                className="ml-4 text-red-600 opacity-0 group-hover:opacity-100 transition"
+                title="Supprimer"
+                onClick={() => handleDelete(r.id)}
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
           </li>
         ))}
       </ul>

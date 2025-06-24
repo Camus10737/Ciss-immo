@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Locataire } from '@/app/types/locataires'
 import { immeublesService } from '@/app/services/immeublesService'
+import { useAuthWithRole } from "@/hooks/useAuthWithRole" // AJOUT
 
 interface TenantDetailsProps {
   locataire: Locataire
@@ -41,6 +42,8 @@ export default function TenantDetails({
     immeubleId: string
   } | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const { canAccessImmeuble } = useAuthWithRole() // AJOUT
 
   // Charger les informations de l'appartement
   useEffect(() => {
@@ -72,6 +75,29 @@ export default function TenantDetails({
 
     chargerInfosAppartement()
   }, [locataire.appartementId])
+
+  // 🔒 Contrôle d'accès : si on a l'info immeubleId et pas le droit, on bloque tout
+  if (
+    appartementInfo &&
+    appartementInfo.immeubleId &&
+    !canAccessImmeuble(appartementInfo.immeubleId)
+  ) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Accès refusé
+          </h2>
+          <p>
+            Vous n'avez pas la permission d'accéder à ce locataire.
+          </p>
+          <Button className="mt-6" onClick={onRetour}>
+            Retour
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('fr-FR', {

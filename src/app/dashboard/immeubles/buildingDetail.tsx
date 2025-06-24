@@ -24,6 +24,7 @@ import {
 import { Immeuble } from "@/app/types";
 import { marquerSortieLocataire } from "@/app/services/locatairesService";
 import { useLocataires } from "@/hooks/useLocataires";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 interface BuildingDetailProps {
   immeuble: Immeuble;
@@ -38,8 +39,46 @@ export function BuildingDetail({
   onEdit,
   onRefresh,
 }: BuildingDetailProps) {
+  // TOUS les hooks ici, AVANT tout return ou if
   const [activeTab, setActiveTab] = useState("infos");
   const router = useRouter();
+  const { canAccessImmeuble } = useAuthWithRole();
+  const { marquerSortie, loading } = useLocataires();
+
+  // Sécurité si immeuble est undefined (optionnel)
+  if (!immeuble) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Immeuble introuvable
+          </h2>
+          <Button className="mt-6" onClick={onBack}>
+            Retour
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Si l'utilisateur n'a pas accès à cet immeuble, on bloque tout
+  if (!canAccessImmeuble(immeuble.id)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Accès refusé
+          </h2>
+          <p>
+            Vous n'avez pas la permission d'accéder à cet immeuble.
+          </p>
+          <Button className="mt-6" onClick={onBack}>
+            Retour
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const getBadgeColor = (type: string) => {
     switch (type) {
@@ -58,6 +97,7 @@ export function BuildingDetail({
     await marquerSortieLocataire(id);
     onRefresh();
   };
+
   const getStatutBadge = (statut: string) => {
     return statut === "occupe" ? (
       <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
@@ -70,8 +110,6 @@ export function BuildingDetail({
     );
   };
 
-  const { marquerSortie, loading } = useLocataires();
-
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("fr-FR", {
       year: "numeric",
@@ -80,7 +118,7 @@ export function BuildingDetail({
     }).format(date);
   };
 
-  // 🔥 NOUVELLE FONCTION : Naviguer vers l'ajout de locataire
+  // Naviguer vers l'ajout de locataire
   const handleAjouterLocataire = (
     appartementId: string,
     appartementNumero: string
@@ -92,19 +130,15 @@ export function BuildingDetail({
       immeubleNom: immeuble.nom,
       retour: "immeuble",
     });
-
-    // 🔥 CORRECTION : Utiliser le bon chemin /dashboard/locataires/add
     router.push(`/dashboard/locataires/add?${params.toString()}`);
   };
 
-  // 🔥 NOUVELLE FONCTION : Naviguer vers les détails du locataire
+  // Naviguer vers les détails du locataire
   const handleVoirLocataire = (locataireId: string) => {
     const params = new URLSearchParams({
       retour: "immeuble",
       immeubleId: immeuble.id,
     });
-
-    // 🔥 CORRECTION : Utiliser le bon chemin /dashboard/locataires/details/[id]
     router.push(
       `/dashboard/locataires/details/${locataireId}?${params.toString()}`
     );
@@ -120,7 +154,7 @@ export function BuildingDetail({
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Header avec design moderne */}
+        {/* Header */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
@@ -152,7 +186,7 @@ export function BuildingDetail({
           </div>
         </div>
 
-        {/* Statistiques avec design amélioré */}
+        {/* Statistiques */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="bg-white border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardContent className="p-6">
@@ -233,7 +267,7 @@ export function BuildingDetail({
           </Card>
         </div>
 
-        {/* Contenu principal avec onglets redesignés */}
+        {/* Onglets */}
         <Card className="bg-white border-0 shadow-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="border-b border-gray-100">
@@ -388,7 +422,7 @@ export function BuildingDetail({
               </Card>
             </TabsContent>
 
-            {/* Onglet Appartements - 🔥 VERSION MODIFIÉE AVEC NAVIGATION */}
+            {/* Onglet Appartements */}
             <TabsContent value="appartements" className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {immeuble.appartements.map((appartement) => (
@@ -408,7 +442,7 @@ export function BuildingDetail({
                     <CardContent>
                       {appartement.locataireActuel ? (
                         <div className="space-y-3">
-                          {/* 🔥 NOM CLIQUABLE pour voir les détails */}
+                          {/* NOM CLIQUABLE pour voir les détails */}
                           <button
                             onClick={() =>
                               handleVoirLocataire(
@@ -581,7 +615,7 @@ export function BuildingDetail({
                                     >
                                       <div className="flex justify-between items-start">
                                         <div>
-                                          {/* 🔥 HISTORIQUE AUSSI CLIQUABLE */}
+                                          {/* HISTORIQUE AUSSI CLIQUABLE */}
                                           <button
                                             onClick={() =>
                                               handleVoirLocataire(locataire.id)

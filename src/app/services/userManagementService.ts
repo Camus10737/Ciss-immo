@@ -80,19 +80,20 @@ export class UserManagementService {
     }
   }
 
-    static async createGestionnaire(
+  // CORRIGÉ : Crée uniquement une invitation, pas de doc dans 'users'
+  static async createGestionnaire(
     superAdminId: string, 
     formData: CreateGestionnaireFormData
-  ): Promise<{ success: boolean; gestionnaire?: Gestionnaire; error?: string }> {
+  ): Promise<{ success: boolean; token?: string; error?: string }> {
     try {
       const existingUser = await this.getUserByEmail(formData.email);
       if (existingUser) {
         return { success: false, error: 'Un utilisateur avec cet email existe déjà' };
       }
-  
+
       // Génère le token UNE SEULE FOIS
       const token = this.generateSecureToken();
-  
+
       // Créer l'invitation en base avec ce token
       const invitationData = {
         email: formData.email,
@@ -101,66 +102,21 @@ export class UserManagementService {
         targetData: {
           name: formData.name,
           phone: formData.phone,
-          immeubles_assignes: formData.immeubles_assignes
+          immeubles_assignes: formData.immeubles_assignes,
+          permissions_supplementaires: this.buildCompletePermissions(formData.permissions_supplementaires),
         },
         invitedBy: superAdminId,
         invitedAt: serverTimestamp(),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
         token // <-- même token partout
       };
-  
+
       await addDoc(collection(db, 'invitations'), invitationData);
-  
-      // Créer le gestionnaire (statut pending) avec le même token
-      const gestionnaireData: Omit<Gestionnaire, 'id'> = {
-        email: formData.email,
-        role: 'GESTIONNAIRE',
-        status: 'pending',
-        name: formData.name,
-        phone: formData.phone,
-        immeubles_assignes: formData.immeubles_assignes,
-        permissions_supplementaires: this.buildCompletePermissions(formData.permissions_supplementaires),
-        invitedBy: superAdminId,
-        invitedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        token // <-- ajoute le token ici aussi
-      };
-  
-      const docRef = await addDoc(collection(db, 'users'), {
-        ...gestionnaireData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        invitedAt: serverTimestamp()
-      });
-  
-      await this.assignImmeubles(formData.immeubles_assignes, docRef.id);
-  
-      const performer = await this.getUserById(superAdminId);
-      const logData = {
-        action: 'USER_CREATED' as const,
-        performedBy: superAdminId,
-        performedByName: performer?.name || 'Utilisateur inconnu',
-        targetUserId: docRef.id,
-        targetUserName: formData.name,
-        details: {
-          role: 'GESTIONNAIRE',
-          immeubles: formData.immeubles_assignes,
-          email: formData.email
-        },
-        timestamp: serverTimestamp()
-      };
-  
-      await addDoc(collection(db, 'activity_logs'), logData);
-  
-      const gestionnaire: Gestionnaire = {
-        id: docRef.id,
-        ...gestionnaireData,
-        // token déjà inclus dans gestionnaireData
-      };
-  
-      return { success: true, gestionnaire };
-  
+
+      // NE PAS créer de document dans 'users' ici !
+
+      return { success: true, token };
+
     } catch (error) {
       console.error("Erreur réelle lors de la création du gestionnaire :", error);
       return { success: false, error: 'Erreur lors de la création du gestionnaire' };

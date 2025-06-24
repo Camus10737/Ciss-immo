@@ -11,11 +11,11 @@ import { FilterOptions, Immeuble } from '@/app/types';
 import { immeublesService } from '@/app/services/immeublesService';
 import { BuildingForm } from './buildingForm';
 import { BuildingDetail } from './buildingDetail';
-
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 export function BuildingList() { 
   const [immeubles, setImmeubles] = useState<Immeuble[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingImmeubles, setLoadingImmeubles] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<FilterOptions>({});
@@ -27,23 +27,26 @@ export function BuildingList() {
   const [selectedImmeuble, setSelectedImmeuble] = useState<Immeuble | null>(null);
   const [editMode, setEditMode] = useState(false);
 
+  // Permissions
+  const { canAccessImmeuble, isGestionnaire, user, loading: loadingUser } = useAuthWithRole();
+
   // Charger les données initiales
   useEffect(() => {
     chargerImmeubles();
     chargerVilles();
+    // eslint-disable-next-line
   }, [filters]);
 
   const chargerImmeubles = async () => {
-    setLoading(true);
+    setLoadingImmeubles(true);
     const result = await immeublesService.obtenirImmeubles(filters);
-    
     if (result.success && result.data) {
       setImmeubles(result.data);
       setError('');
     } else {
       setError(result.error || 'Erreur lors du chargement');
     }
-    setLoading(false);
+    setLoadingImmeubles(false);
   };
 
   const chargerVilles = async () => {
@@ -55,7 +58,6 @@ export function BuildingList() {
 
   const handleSupprimerImmeuble = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet immeuble ?')) return;
-    
     const result = await immeublesService.supprimerImmeuble(id);
     if (result.success) {
       chargerImmeubles();
@@ -86,8 +88,34 @@ export function BuildingList() {
     chargerImmeubles();
   };
 
+  // Affichage de chargement tant que user ou immeubles ne sont pas prêts
+  if (loadingUser || loadingImmeubles) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-blue-600 bg-blue-50 transition ease-in-out duration-150">
+          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Chargement des immeubles...
+        </div>
+      </div>
+    );
+  }
+
+  // Debug temporaire (à retirer en prod)
+  // console.log("User:", user);
+  // console.log("Immeubles assignés:", user?.immeubles_assignes);
+  // console.log("Immeubles chargés:", immeubles.map(im => im.id));
+  // immeubles.forEach(im => {
+  //   console.log(im.id, canAccessImmeuble(im.id));
+  // });
+
+  // Filtrer les immeubles par permissions
+  const immeublesAutorises = immeubles.filter(im => canAccessImmeuble(im.id));
+
   // Filtrer les immeubles par terme de recherche
-  const immeublesFiltres = immeubles.filter(immeuble =>
+  const immeublesFiltres = immeublesAutorises.filter(immeuble =>
     immeuble.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     immeuble.ville.toLowerCase().includes(searchTerm.toLowerCase()) ||
     immeuble.quartier.toLowerCase().includes(searchTerm.toLowerCase())
@@ -118,24 +146,24 @@ export function BuildingList() {
   }
 
   if (showDetail && selectedImmeuble) {
-  return (
-    <BuildingDetail
-      immeuble={selectedImmeuble}
-      onBack={() => setShowDetail(false)}
-      onEdit={() => {
-        setShowDetail(false);
-        handleModifierImmeuble(selectedImmeuble);
-      }}
-      onRefresh={async () => {
-        await chargerImmeubles();
-        const refreshed = await immeublesService.obtenirImmeuble(selectedImmeuble.id);
-        if (refreshed.success && refreshed.data) {
-          setSelectedImmeuble(refreshed.data);
-        }
-      }}
-    />
-  );
-}
+    return (
+      <BuildingDetail
+        immeuble={selectedImmeuble}
+        onBack={() => setShowDetail(false)}
+        onEdit={() => {
+          setShowDetail(false);
+          handleModifierImmeuble(selectedImmeuble);
+        }}
+        onRefresh={async () => {
+          await chargerImmeubles();
+          const refreshed = await immeublesService.obtenirImmeuble(selectedImmeuble.id);
+          if (refreshed.success && refreshed.data) {
+            setSelectedImmeuble(refreshed.data);
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -146,13 +174,16 @@ export function BuildingList() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestion des immeubles</h1>
             <p className="text-gray-600">Gérez vos biens immobiliers et leurs appartements</p>
           </div>
-          <Button 
-            onClick={handleNouvelImmeuble} 
-            className="bg-blue-600 hover:bg-blue-700 shadow-sm transition-all duration-200"
-          >
-            <Plus size={18} className="mr-2" />
-            Nouvel immeuble
-          </Button>
+          {/* Bouton d'ajout visible seulement si NON gestionnaire */}
+          {!isGestionnaire() && (
+            <Button 
+              onClick={handleNouvelImmeuble} 
+              className="bg-blue-600 hover:bg-blue-700 shadow-sm transition-all duration-200"
+            >
+              <Plus size={18} className="mr-2" />
+              Nouvel immeuble
+            </Button>
+          )}
         </div>
       </div>
 
@@ -221,29 +252,21 @@ export function BuildingList() {
       )}
 
       {/* Liste des immeubles */}
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-blue-600 bg-blue-50 transition ease-in-out duration-150">
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Chargement des immeubles...
-          </div>
-        </div>
-      ) : immeublesFiltres.length === 0 ? (
+      {immeublesFiltres.length === 0 ? (
         <Card className="bg-white border-0 shadow-sm">
           <CardContent className="text-center py-12">
             <Building2 size={64} className="mx-auto text-gray-300 mb-6" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun immeuble trouvé</h3>
             <p className="text-gray-600 mb-6">Commencez par créer votre premier immeuble</p>
-            <Button 
-              onClick={handleNouvelImmeuble} 
-              className="bg-blue-600 hover:bg-blue-700 shadow-sm"
-            >
-              <Plus size={18} className="mr-2" />
-              Créer votre premier immeuble
-            </Button>
+            {!isGestionnaire() && (
+              <Button 
+                onClick={handleNouvelImmeuble} 
+                className="bg-blue-600 hover:bg-blue-700 shadow-sm"
+              >
+                <Plus size={18} className="mr-2" />
+                Créer votre premier immeuble
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -294,22 +317,27 @@ export function BuildingList() {
                     <Eye size={16} className="mr-2" />
                     Détails
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleModifierImmeuble(immeuble)}
-                    className="border-gray-200 hover:bg-gray-50"
-                  >
-                    <Edit size={16} />
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleSupprimerImmeuble(immeuble.id)}
-                    className="border-red-200 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+                  {/* Les boutons modifier/supprimer sont cachés pour les gestionnaires */}
+                  {!isGestionnaire() && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleModifierImmeuble(immeuble)}
+                        className="border-gray-200 hover:bg-gray-50"
+                      >
+                        <Edit size={16} />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleSupprimerImmeuble(immeuble.id)}
+                        className="border-red-200 text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

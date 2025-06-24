@@ -5,6 +5,7 @@ import { depensesService } from "@/app/services/depensesService";
 import { useLocataires } from "@/hooks/useLocataires";
 import { Button } from "@/components/ui/button";
 import { saveRapportAnnuel } from "@/app/services/rapportService";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole"; // <-- Ajout
 
 function getMonthName(month: number) {
   return [
@@ -33,15 +34,14 @@ export function RapportAnnuel({
   onClose,
   rapport,
   readOnly = false,
-  immeubleId, // <-- Ajout de la prop
+  immeubleId,
 }: {
   open: boolean;
   onClose: () => void;
   rapport?: any;
   readOnly?: boolean;
-  immeubleId?: string; // <-- Ajout de la prop
+  immeubleId?: string;
 }) {
-  // Si on est en lecture seule, on utilise les données du rapport passé en props
   const [annee, setAnnee] = useState<number>(
     rapport?.annee ?? new Date().getFullYear()
   );
@@ -52,7 +52,8 @@ export function RapportAnnuel({
   const { locataires } = useLocataires();
   const [saving, setSaving] = useState(false);
 
-  // Pour retrouver le nom du locataire à partir de l'id
+  const { canWriteComptabilite } = useAuthWithRole(); // <-- Ajout
+
   const getLocataireNom = (id: string) => {
     const loc = (locataires || []).find((l) => l.id === id);
     return loc ? `${loc.prenom} ${loc.nom}` : id;
@@ -63,7 +64,6 @@ export function RapportAnnuel({
     const recusValides = await recuService.getRecusValides();
     const depensesFirestore = await depensesService.getDepenses();
 
-    // Filtrage par immeuble
     const recusFiltres = immeubleId
       ? recusValides.filter(r => r.immeubleId === immeubleId)
       : recusValides;
@@ -82,9 +82,8 @@ export function RapportAnnuel({
       setTab("synthese");
     }
     // eslint-disable-next-line
-  }, [open, rapport, immeubleId]); // <-- Ajoute immeubleId dans les dépendances
+  }, [open, rapport, immeubleId]);
 
-  // Données à afficher : si rapport fourni, on l'utilise, sinon on calcule
   const ressources = rapport?.ressources
     ? rapport.ressources.map((r) => ({
         ...r,
@@ -122,20 +121,16 @@ export function RapportAnnuel({
     rapport?.totalDepenses ?? depensesList.reduce((a, b) => a + b.montant, 0);
   const bilan = rapport?.bilan ?? totalRessources - totalDepenses;
 
-  // Retards de paiement (locataires actuels uniquement)
   const locatairesActuels = (locataires || []).filter((l) => !l.dateSortie);
   const moisCourant = new Date().getMonth();
   const clientsRetard =
     rapport?.clientsRetard ??
     locatairesActuels.map((loc) => {
-      // Si filtrage immeuble, ne garder que les locataires de l'immeuble
       if (immeubleId && loc.immeubleId !== immeubleId) return null;
       const dateEntree = new Date(loc.dateEntree);
       const anneeEntree = dateEntree.getFullYear();
       const moisEntree = dateEntree.getMonth();
 
-      // Si le locataire est entré cette année, on commence à son mois d'entrée
-      // Sinon, on commence à janvier
       const moisDebut = anneeEntree === annee ? moisEntree : 0;
       const moisFin = annee === new Date().getFullYear() ? moisCourant : 11;
 
@@ -158,18 +153,15 @@ export function RapportAnnuel({
         moisNonPayes,
         aJour: moisNonPayes.length === 0,
       };
-    }).filter(Boolean); // <-- enlève les null
+    }).filter(Boolean);
 
   if (!open) return null;
 
-  // Nombre de lignes = le plus grand des deux tableaux
   const maxRows = Math.max(ressources.length, depensesList.length);
 
-  // Fonction pour sauvegarder le rapport
   const handleSaveRapport = async () => {
     setSaving(true);
     try {
-      // ... ici tu dois mettre la logique de conversion des dates ...
       const ressourcesToSave = ressources.map((r) => ({
         ...r,
         date: r.date ? r.date.toISOString() : null,
@@ -178,7 +170,7 @@ export function RapportAnnuel({
         ...d,
         date: d.date ? d.date.toISOString() : null,
       }));
-      const clientsRetardToSave = clientsRetard; // Pas besoin de conversion spéciale
+      const clientsRetardToSave = clientsRetard;
 
       const rapportToSave = {
         annee,
@@ -189,7 +181,7 @@ export function RapportAnnuel({
         bilan,
         clientsRetard: clientsRetardToSave,
         date: new Date().toISOString(),
-        immeubleId: immeubleId || null, // <-- Ajoute l'immeubleId au rapport sauvegardé
+        immeubleId: immeubleId || null,
       };
       await saveRapportAnnuel(rapportToSave);
       onClose();
@@ -411,18 +403,24 @@ export function RapportAnnuel({
               </div>
             )}
           </div>
-          {/* Bouton OK toujours visible en bas */}
+          {/* Bouton OK/enregistrer visible seulement si permission */}
           <div className="w-full px-8 py-4 border-t bg-white flex justify-end sticky bottom-0 z-20">
-            <Button
-              className="bg-green-600 hover:bg-green-700 text-white px-8 py-2"
-              onClick={readOnly ? onClose : handleSaveRapport}
-              disabled={saving}
-            >
-              {saving ? "Enregistrement..." : "OK"}
-            </Button>
+            {readOnly || (immeubleId && canWriteComptabilite(immeubleId)) ? (
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-2"
+                onClick={readOnly ? onClose : handleSaveRapport}
+                disabled={saving}
+              >
+                {saving ? "Enregistrement..." : "OK"}
+              </Button>
+            ) : (
+              <div className="text-red-600 font-semibold py-2">
+                Vous n'avez pas la permission d'enregistrer ce rapport.
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

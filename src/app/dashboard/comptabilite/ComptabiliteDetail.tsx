@@ -18,6 +18,7 @@ import { DepensesList } from "./components/DepensesList";
 import { AjoutDepenseForm } from "./components/AjoutDepenseForm";
 import { RapportAnnuel } from "./components/RapportAnnuel";
 import { ListeRapportsFinanciers } from "./components/ListeRapportsFinanciers";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole"; // Ajout
 
 export function ComptabiliteDetail({}) {
   const [activeTab, setActiveTab] = useState("revenus");
@@ -49,6 +50,10 @@ export function ComptabiliteDetail({}) {
   const handleSaveDepense = (depense: any) => {
     setDepenses((prev) => [...prev, depense]);
   };
+
+  // Ajout pour filtrer les immeubles selon les droits du gestionnaire
+  const { canAccessImmeuble } = useAuthWithRole();
+  const immeublesAutorises = immeubles.filter(im => canAccessImmeuble(im.id));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -147,7 +152,7 @@ export function ComptabiliteDetail({}) {
               {loading ? (
                 <div>Chargement des locataires...</div>
               ) : (
-                <DepotRecuForm locataires={locatairesActuels} immeubles={immeubles} />
+                <DepotRecuForm locataires={locatairesActuels} immeubles={immeublesAutorises} />
               )}
             </CardContent>
           </Card>
@@ -178,7 +183,7 @@ export function ComptabiliteDetail({}) {
                   className="border rounded px-2 py-1"
                 >
                   <option value="">Tous les immeubles</option>
-                  {immeubles.map(im => (
+                  {immeublesAutorises.map(im => (
                     <option key={im.id} value={im.id}>
                       {im.nom}
                     </option>
@@ -225,14 +230,14 @@ export function ComptabiliteDetail({}) {
                   className="border rounded px-2 py-1"
                 >
                   <option value="">Tous les immeubles</option>
-                  {immeubles.map(im => (
+                  {immeublesAutorises.map(im => (
                     <option key={im.id} value={im.id}>
                       {im.nom}
                     </option>
                   ))}
                 </select>
               </div>
-              <ListeRapportsFinanciers refresh={refreshRapports} immeubles={immeubles} />
+              <ListeRapportsFinanciers refresh={refreshRapports} immeubles={immeublesAutorises} />
             </CardContent>
             <RapportAnnuel
               open={showRapport}

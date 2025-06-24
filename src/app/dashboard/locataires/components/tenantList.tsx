@@ -11,22 +11,42 @@ import { UserPlus, Edit, Trash2, LogOut, Phone, Mail, Calendar, Search, Filter, 
 import { getLocataires, deleteLocataire, marquerSortieLocataire } from "@/app/services/locatairesService"
 import { useAuth } from "@/hooks/useAuth"
 import type { Locataire } from "@/app/types/locataires"
+import { immeublesService } from "@/app/services/immeublesService"
+import { useAuthWithRole } from "@/hooks/useAuthWithRole" // AJOUT
 
 export default function TenantList() {
   const router = useRouter()
   const { user } = useAuth()
+  const { canAccessImmeuble, isGestionnaire } = useAuthWithRole() // AJOUT
 
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [filteredLocataires, setFilteredLocataires] = useState<Locataire[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statutFilter, setStatutFilter] = useState("tous")
+  const [immeubleMap, setImmeubleMap] = useState<Record<string, string>>({}) // appartementId -> immeubleId
+
+  // Charger la correspondance appartementId -> immeubleId
+  useEffect(() => {
+    const chargerImmeubles = async () => {
+      const result = await immeublesService.obtenirImmeubles()
+      if (result.success && result.data) {
+        const map: Record<string, string> = {}
+        for (const im of result.data) {
+          for (const apt of im.appartements) {
+            map[apt.id] = im.id
+          }
+        }
+        setImmeubleMap(map)
+      }
+    }
+    chargerImmeubles()
+  }, [])
 
   // Charger les locataires
   useEffect(() => {
     const chargerLocataires = async () => {
       if (!user) return
-
       try {
         const locatairesData = await getLocataires(user.uid)
         setLocataires(locatairesData)
@@ -37,13 +57,22 @@ export default function TenantList() {
         setLoading(false)
       }
     }
-
     chargerLocataires()
   }, [user])
 
   // Appliquer les filtres
   useEffect(() => {
     let filtered = [...locataires]
+
+    // 🔒 Filtrer selon les droits du gestionnaire
+    if (isGestionnaire()) {
+      filtered = filtered.filter(
+        (locataire) =>
+          locataire.appartementId &&
+          immeubleMap[locataire.appartementId] &&
+          canAccessImmeuble(immeubleMap[locataire.appartementId])
+      )
+    }
 
     // Filtre par recherche
     if (searchTerm) {
@@ -65,7 +94,7 @@ export default function TenantList() {
     }
 
     setFilteredLocataires(filtered)
-  }, [locataires, searchTerm, statutFilter])
+  }, [locataires, searchTerm, statutFilter, immeubleMap, canAccessImmeuble, isGestionnaire])
 
   const handleDeleteLocataire = async (id: string, nom: string, prenom: string) => {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${prenom} ${nom} ?`)) {
@@ -94,11 +123,11 @@ export default function TenantList() {
   }
 
   const formatDate = (date: Date): string => {
-    return date.toLocaleDateString("fr-FR")
+    return new Date(date).toLocaleDateString("fr-FR")
   }
 
-  const locatairesActuels = locataires.filter((l) => !l.dateSortie).length
-  const ancienLocataires = locataires.filter((l) => l.dateSortie).length
+  const locatairesActuels = filteredLocataires.filter((l) => !l.dateSortie).length
+  const ancienLocataires = filteredLocataires.filter((l) => l.dateSortie).length
 
   if (loading) {
     return (
@@ -127,7 +156,7 @@ export default function TenantList() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-blue-600 mb-2">{locataires.length}</div>
+              <div className="text-3xl font-bold text-blue-600 mb-2">{filteredLocataires.length}</div>
               <div className="text-blue-800 font-medium">Total Locataires</div>
             </CardContent>
           </Card>
@@ -146,16 +175,18 @@ export default function TenantList() {
         </div>
 
         {/* Actions principales */}
-        <div className="flex justify-center mb-8">
-          <Button
-            onClick={() => router.push("/dashboard/locataires/add")}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-            size="lg"
-          >
-            <UserPlus className="h-5 w-5 mr-2" />
-            Ajouter un Locataire
-          </Button>
-        </div>
+        {!isGestionnaire() && (
+          <div className="flex justify-center mb-8">
+            <Button
+              onClick={() => router.push("/dashboard/locataires/add")}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+              size="lg"
+            >
+              <UserPlus className="h-5 w-5 mr-2" />
+              Ajouter un Locataire
+            </Button>
+          </div>
+        )}
 
         {/* Filtres */}
         <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
@@ -216,7 +247,7 @@ export default function TenantList() {
                   ? "Commencez par ajouter votre premier locataire pour gérer vos biens immobiliers"
                   : "Aucun locataire ne correspond à vos critères de recherche"}
               </p>
-              {locataires.length === 0 && (
+              {!isGestionnaire() && locataires.length === 0 && (
                 <Button
                   onClick={() => router.push("/dashboard/locataires/add")}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
@@ -311,39 +342,41 @@ export default function TenantList() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex flex-col gap-3 ml-6">
-                      {!locataire.dateSortie && (
+                    {!isGestionnaire() && (
+                      <div className="flex flex-col gap-3 ml-6">
+                        {!locataire.dateSortie && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleMarquerSortie(locataire.id, locataire.nom, locataire.prenom)}
+                            className="flex items-center gap-2 border-orange-200 text-orange-700 hover:bg-orange-50"
+                          >
+                            <LogOut className="h-4 w-4" />
+                            Marquer sortie
+                          </Button>
+                        )}
+
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleMarquerSortie(locataire.id, locataire.nom, locataire.prenom)}
-                          className="flex items-center gap-2 border-orange-200 text-orange-700 hover:bg-orange-50"
+                          onClick={() => router.push(`/dashboard/locataires/${locataire.id}/edit`)}
+                          className="flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
                         >
-                          <LogOut className="h-4 w-4" />
-                          Marquer sortie
+                          <Edit className="h-4 w-4" />
+                          Modifier
                         </Button>
-                      )}
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/dashboard/locataires/${locataire.id}/edit`)}
-                        className="flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Modifier
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteLocataire(locataire.id, locataire.nom, locataire.prenom)}
-                        className="flex items-center gap-2 border-red-200 text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Supprimer
-                      </Button>
-                    </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteLocataire(locataire.id, locataire.nom, locataire.prenom)}
+                          className="flex items-center gap-2 border-red-200 text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Supprimer
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

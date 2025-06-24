@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth"
 import type { LocataireFormData } from "@/app/types/locataires"
 import { immeublesService } from "@/app/services/immeublesService"
 import type { Immeuble } from "@/app/types"
+import { useAuthWithRole } from "@/hooks/useAuthWithRole" // AJOUT
 
 interface TenantFormProps {
   initialData?: Partial<LocataireFormData>
@@ -25,6 +26,7 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
+  const { canAccessImmeuble, isGestionnaire } = useAuthWithRole() // AJOUT
 
   // Récupérer les paramètres URL
   const appartementIdFromUrl = searchParams.get('appartementId')
@@ -45,25 +47,21 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  
-  // 🔥 NOUVEAU : États pour la sélection en cascade
   const [immeubles, setImmeubles] = useState<Immeuble[]>([])
   const [immeubleSelectionne, setImmeubleSelectionne] = useState<string>(immeubleIdFromUrl || "")
   const [loadingImmeubles, setLoadingImmeubles] = useState(true)
-
-  // État pour l'appartement pré-sélectionné
   const [appartementPreselectionne, setAppartementPreselectionne] = useState<{
     numero: string;
     immeubleNom: string;
   } | null>(null)
 
-  // 🔥 NOUVEAU : Charger tous les immeubles au lieu des appartements disponibles
+  // Charger tous les immeubles puis filtrer selon les droits
   useEffect(() => {
     const chargerImmeubles = async () => {
       try {
         const result = await immeublesService.obtenirImmeubles()
         if (result.success && result.data) {
-          setImmeubles(result.data)
+          setImmeubles(result.data.filter(im => canAccessImmeuble(im.id)))
         }
       } catch (error) {
         console.error("Erreur lors du chargement des immeubles:", error)
@@ -71,8 +69,8 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
         setLoadingImmeubles(false)
       }
     }
-
     chargerImmeubles()
+    // eslint-disable-next-line
   }, [])
 
   // Gérer l'appartement pré-sélectionné depuis l'URL
@@ -85,20 +83,16 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
     }
   }, [appartementIdFromUrl, appartementNumeroFromUrl, immeubleNomFromUrl])
 
-  // 🔥 NOUVEAU : Obtenir les appartements de l'immeuble sélectionné
+  // Obtenir les appartements de l'immeuble sélectionné
   const getAppartementsImmeuble = () => {
     if (!immeubleSelectionne) return []
-    
     const immeuble = immeubles.find(imm => imm.id === immeubleSelectionne)
     return immeuble?.appartements || []
   }
 
-  // 🔥 NOUVEAU : Gérer la sélection d'immeuble
   const handleImmeubleChange = (immeubleId: string) => {
     setImmeubleSelectionne(immeubleId)
-    // Réinitialiser la sélection d'appartement
     setFormData(prev => ({ ...prev, appartementId: "" }))
-    // Effacer l'erreur d'appartement
     if (errors.appartementId) {
       setErrors(prev => ({ ...prev, appartementId: "" }))
     }
@@ -106,35 +100,19 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
-
-    if (!formData.nom.trim()) {
-      newErrors.nom = "Le nom est requis"
-    }
-    if (!formData.prenom.trim()) {
-      newErrors.prenom = "Le prénom est requis"
-    }
-    if (!formData.telephone || !formData.telephone.trim()) {
-      newErrors.telephone = "Le téléphone est requis"
-    }
-    if (!immeubleSelectionne) {
-      newErrors.immeuble = "Veuillez sélectionner un immeuble"
-    }
-    if (!formData.appartementId) {
-      newErrors.appartementId = "Veuillez sélectionner un appartement"
-    }
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Format d'email invalide"
-    }
-
+    if (!formData.nom.trim()) newErrors.nom = "Le nom est requis"
+    if (!formData.prenom.trim()) newErrors.prenom = "Le prénom est requis"
+    if (!formData.telephone || !formData.telephone.trim()) newErrors.telephone = "Le téléphone est requis"
+    if (!immeubleSelectionne) newErrors.immeuble = "Veuillez sélectionner un immeuble"
+    if (!formData.appartementId) newErrors.appartementId = "Veuillez sélectionner un appartement"
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = "Format d'email invalide"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!validateForm() || !user) return
-
     setLoading(true)
     try {
       if (isEditing && locataireId) {
@@ -142,8 +120,6 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
       } else {
         await createLocataire(formData, user.uid)
       }
-
-      // Navigation intelligente selon le retour
       if (retourFromUrl === 'immeuble' && immeubleIdFromUrl) {
         router.push(`/dashboard?section=immeubles&action=detail&id=${immeubleIdFromUrl}&tab=appartements`)
       } else {
@@ -172,9 +148,29 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
     }
   }
 
+  // 🔒 Bloque l'accès si le gestionnaire n'a aucun immeuble autorisé
+  if (isGestionnaire() && !loadingImmeubles && immeubles.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Accès refusé
+          </h2>
+          <p>
+            Vous n'avez pas la permission d'ajouter un locataire (aucun immeuble autorisé).
+          </p>
+          <Button className="mt-6" onClick={handleRetour}>
+            Retour
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
       <div className="container mx-auto px-4 py-8">
+        {/* ...le reste de ton formulaire inchangé... */}
         {/* En-tête */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
@@ -304,7 +300,7 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
                 </div>
               </div>
 
-              {/* 🔥 NOUVEAU : Section Logement avec sélection en cascade */}
+              {/* Section Logement avec sélection en cascade */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">

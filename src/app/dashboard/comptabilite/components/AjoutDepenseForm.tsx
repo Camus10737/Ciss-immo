@@ -2,17 +2,18 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { depensesService } from "@/app/services/depensesService";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 const comptesDefaut = ["Autres"];
 
 export function AjoutDepenseForm({
   onSave,
   onClose,
-  immeubleId, // <-- Ajoute cette prop
+  immeubleId,
 }: {
   onSave: () => void;
   onClose: () => void;
-  immeubleId: string; // <-- Ajoute cette prop
+  immeubleId: string;
 }) {
   const [comptes, setComptes] = useState<string[]>(comptesDefaut);
   const [client, setClient] = useState("");
@@ -20,6 +21,7 @@ export function AjoutDepenseForm({
   const [montant, setMontant] = useState("");
   const [showAddCompte, setShowAddCompte] = useState(false);
   const [nouveauCompte, setNouveauCompte] = useState("");
+  const { canWriteComptabilite } = useAuthWithRole();
 
   // Charger la liste des comptes depuis le localStorage au montage
   useEffect(() => {
@@ -31,6 +33,10 @@ export function AjoutDepenseForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWriteComptabilite(immeubleId)) {
+      alert("Vous n'avez pas la permission d'ajouter une dépense sur cet immeuble.");
+      return;
+    }
     const compteFinal = showAddCompte ? nouveauCompte : client;
     if (!compteFinal || !montant) return;
     await depensesService.ajouterDepense({
@@ -38,9 +44,8 @@ export function AjoutDepenseForm({
       description,
       montant: Number(montant),
       date: new Date(),
-      immeubleId, // <-- Ajoute l'immeubleId ici
+      immeubleId,
     });
-    // Si un nouveau compte a été ajouté, on le sauvegarde dans le localStorage
     if (showAddCompte && nouveauCompte && !comptes.includes(nouveauCompte)) {
       const newComptes = [...comptes, nouveauCompte];
       setComptes(newComptes);
@@ -54,6 +59,26 @@ export function AjoutDepenseForm({
     onSave();
     onClose();
   };
+
+  // Si pas la permission, affiche un message et rien d'autre
+  if (!canWriteComptabilite(immeubleId)) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full relative text-center">
+          <button
+            type="button"
+            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+          <div className="mb-4 font-semibold text-lg text-red-600">
+            Vous n'avez pas la permission d'ajouter une dépense sur cet immeuble.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
