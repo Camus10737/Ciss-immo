@@ -1,6 +1,3 @@
-// src/app/dashboard/page.tsx
-// Remplace SEULEMENT la partie import et header, garde le reste de ton code !
-
 "use client";
 
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
@@ -22,7 +19,6 @@ import TenantList from "./locataires/components/tenantList";
 import { ComptabiliteDetail } from "@/app/dashboard/comptabilite/ComptabiliteDetail";
 import { getLocataires } from "@/app/services/locatairesService";
 import { AdminSection } from "./administrateur/components/AdminSection";
-// 🆕 AJOUTE CET IMPORT
 import { ProfileNavbarLinkWithAvatar } from "./profile/components/ProfileNavbarLink";
 
 type Section = "immeubles" | "locataires" | "comptabilite" | "statistiques" | "administrateur";
@@ -112,35 +108,35 @@ export default function DashboardPage() {
       label: "Immeubles",
       icon: Building2,
       description: "Gérez vos biens immobiliers",
-      roles: ["SUPER_ADMIN", "GESTIONNAIRE"],
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE", "ADMIN"],
     },
     {
       id: "locataires" as Section,
       label: "Locataires",
       icon: Users,
       description: "Gestion des locataires",
-      roles: ["SUPER_ADMIN", "GESTIONNAIRE"],
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE", "ADMIN"],
     },
     {
       id: "comptabilite" as Section,
       label: "Comptabilité",
       icon: Calculator,
       description: "Revenus et dépenses",
-      roles: ["SUPER_ADMIN", "GESTIONNAIRE", "LOCATAIRE"],
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE", "LOCATAIRE", "ADMIN"],
     },
     {
       id: "statistiques" as Section,
       label: "Statistiques",
       icon: BarChart3,
       description: "Analyses et rapports",
-      roles: ["SUPER_ADMIN", "GESTIONNAIRE"],
+      roles: ["SUPER_ADMIN", "GESTIONNAIRE", "ADMIN"],
     },
     {
       id: "administrateur" as Section,
       label: "Administrateur",
       icon: Shield,
       description: "Gestion des utilisateurs",
-      roles: ["SUPER_ADMIN"],
+      roles: ["SUPER_ADMIN", "ADMIN"], // Correction ici
     },
   ];
 
@@ -198,7 +194,7 @@ export default function DashboardPage() {
           </Card>
         );
       case "administrateur":
-        if (userRole !== "SUPER_ADMIN") {
+        if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
           return (
             <Card className="bg-white border-0 shadow-sm">
               <CardContent className="pt-6">
@@ -208,7 +204,7 @@ export default function DashboardPage() {
                     Accès non autorisé
                   </h3>
                   <p className="text-gray-600">
-                    Seuls les super administrateurs peuvent accéder à cette section.
+                    Seuls les administrateurs peuvent accéder à cette section.
                   </p>
                 </div>
               </CardContent>
@@ -237,7 +233,6 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* 🆕 REMPLACE CETTE PARTIE */}
               <div className="flex items-center space-x-3">
                 <ProfileNavbarLinkWithAvatar />
                 {/* Badge de rôle */}
@@ -247,8 +242,6 @@ export default function DashboardPage() {
                   </span>
                 )}
               </div>
-              {/* FIN DE LA PARTIE REMPLACÉE */}
-              
               <Button
                 onClick={handleLogout}
                 variant="outline"

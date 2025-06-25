@@ -19,14 +19,17 @@ import { GestionnairesList } from "./GestionnairesList";
 import { ActivityLogs } from "./ActivityLogs";
 import PermissionsManager from "./PermissionsManager";
 import { InvitationsList } from "./InvitationsList";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
+import AjouterAdminForm from "./AjouterAdminForm"; // À créer si pas déjà fait
 
-type AdminTab = "gestionnaires" | "invitations" | "permissions" | "logs";
-
+type AdminTab = "gestionnaires" | "invitations" | "permissions" | "logs" | "ajouter-admin";
 
 export function AdminSection() {
   const searchParams = useSearchParams();
   const urlToken = searchParams.get("token");
   const urlTab = searchParams.get("tab");
+
+  const { isSuperAdmin } = useAuthWithRole();
 
   const [activeTab, setActiveTab] = useState<AdminTab>("gestionnaires");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -141,7 +144,7 @@ export function AdminSection() {
             onValueChange={(value) => setActiveTab(value as AdminTab)}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsList className={`grid w-full ${isSuperAdmin() ? "grid-cols-5" : "grid-cols-4"} mb-6`}>
               <TabsTrigger
                 value="gestionnaires"
                 className="flex items-center space-x-2"
@@ -167,6 +170,16 @@ export function AdminSection() {
                 <Activity size={18} />
                 <span>Historique</span>
               </TabsTrigger>
+              {/* Onglet visible uniquement pour le super admin */}
+              {isSuperAdmin() && (
+                <TabsTrigger
+                  value="ajouter-admin"
+                  className="flex items-center space-x-2"
+                >
+                  <UserPlus size={18} />
+                  <span>Ajouter un admin</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Contenu des onglets */}
@@ -193,6 +206,13 @@ export function AdminSection() {
             <TabsContent value="logs" className="mt-0">
               <ActivityLogs refreshKey={refreshKey} />
             </TabsContent>
+
+            {/* Onglet d'ajout d'admin, visible seulement pour le super admin */}
+            {isSuperAdmin() && (
+              <TabsContent value="ajouter-admin" className="mt-0">
+                <AjouterAdminForm />
+              </TabsContent>
+            )}
           </Tabs>
         </CardContent>
       </Card>

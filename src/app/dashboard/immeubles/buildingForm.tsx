@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Immeuble, ImmeubleFormData } from "@/app/types";
 import { immeublesService } from "@/app/services/immeublesService";
-import { useAuthWithRole } from "@/hooks/useAuthWithRole"; // AJOUT
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 interface BuildingFormProps {
   immeuble?: Immeuble | null;
@@ -34,10 +34,10 @@ export function BuildingForm({
     },
   });
 
-  const { isGestionnaire } = useAuthWithRole(); // AJOUT
+  const { canAddImmeuble } = useAuthWithRole();
 
-  // 🔒 Bloque l'accès au formulaire pour les gestionnaires
-  if (isGestionnaire()) {
+  // 🔒 Bloque l'accès au formulaire pour tous sauf le super admin
+  if (!canAddImmeuble()) {
     return (
       <div className="text-red-600 text-center font-semibold p-8">
         Vous n'avez pas la permission d’ajouter ou modifier un immeuble.

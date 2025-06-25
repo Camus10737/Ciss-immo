@@ -30,7 +30,7 @@ import {
 
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Immeuble } from "@/app/types";
-import { DataFilterService } from "@/app/services/dataFilterService";
+import { immeublesService } from "@/app/services/immeublesService"; // Correction ici
 import {
   CreateGestionnaireFormData,
   ImmeubleAssignment,
@@ -48,7 +48,7 @@ export function CreateGestionnaireModal({
   onClose,
   onSuccess,
 }: CreateGestionnaireModalProps) {
-  const { user } = useAuthWithRole();
+  const { user, isAdmin, isSuperAdmin } = useAuthWithRole();
   const [loading, setLoading] = useState(false);
   const [immeubles, setImmeubles] = useState<Immeuble[]>([]);
   const [formData, setFormData] = useState<CreateGestionnaireFormData>({
@@ -59,16 +59,27 @@ export function CreateGestionnaireModal({
     permissions_supplementaires: {},
   });
 
-  // Charger les immeubles disponibles
+  // Charger les immeubles disponibles selon le rôle
   useEffect(() => {
     const loadImmeubles = async () => {
       if (user?.uid && isOpen) {
-        const data = await DataFilterService.getFilteredImmeubles(user.uid);
+        let data: Immeuble[] = [];
+        if (isSuperAdmin()) {
+          // Super admin : tous les immeubles
+          const res = await immeublesService.obtenirImmeubles({});
+          data = res.data || [];
+        } else if (isAdmin()) {
+          // Admin : seulement ses immeubles assignés
+          const res = await immeublesService.obtenirImmeubles({});
+          const allImmeubles = res.data || [];
+          const assignedIds = user.immeubles_assignes?.map((im: any) => im.id) || [];
+          data = allImmeubles.filter(im => assignedIds.includes(im.id));
+        }
         setImmeubles(data);
       }
     };
     loadImmeubles();
-  }, [user?.uid, isOpen]);
+  }, [user?.uid, isOpen, isAdmin, isSuperAdmin]);
 
   // Réinitialiser le formulaire à l'ouverture
   useEffect(() => {

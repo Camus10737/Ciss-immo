@@ -1,7 +1,8 @@
 /**
 RÔLES UTILISATEURS
  */
-export type UserRole = 'SUPER_ADMIN' | 'GESTIONNAIRE' | 'LOCATAIRE';
+// Ajout du rôle ADMIN
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'GESTIONNAIRE' | 'LOCATAIRE';
 
 /**
  *  PERMISSIONS GRANULAIRES
@@ -45,6 +46,15 @@ export interface User {
  */
 export interface SuperAdmin extends User {
   role: 'SUPER_ADMIN';
+  name: string;
+  phone?: string;
+}
+
+/**
+  ADMIN
+ */
+export interface Admin extends User {
+  role: 'ADMIN';
   name: string;
   phone?: string;
 }
@@ -121,6 +131,13 @@ export interface CreateLocataireUserFormData {
   appartementId: string;
 }
 
+// Ajout d'un formulaire pour créer un admin
+export interface CreateAdminFormData {
+  name: string;
+  email: string;
+  phone?: string;
+}
+
 /**
  FILTRES ET RECHERCHE
  */
@@ -134,7 +151,7 @@ export interface UserFilters {
   CONTEXTE UTILISATEUR (pour l'app)
  */
 export interface UserContext {
-  user: SuperAdmin | Gestionnaire | LocataireUser;
+  user: SuperAdmin | Admin | Gestionnaire | LocataireUser;
   permissions: {
     canManageUsers: boolean;
     canAccessImmeuble: (immeubleId: string) => boolean;

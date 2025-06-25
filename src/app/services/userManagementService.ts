@@ -431,4 +431,41 @@ export class UserManagementService {
            Math.random().toString(36).substring(2, 15) +
            Date.now().toString(36);
   }
+
+  /**
+   * Crée une invitation pour un nouvel administrateur (ADMIN).
+   * Utilisé par le super admin pour inviter un nouvel admin.
+   */
+  static async createAdmin({ email, name }: { email: string; name: string }) {
+    try {
+      // Vérifie si un utilisateur existe déjà avec cet email
+      const q = query(collection(db, "users"), where("email", "==", email));
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        return { success: false, error: "Cet email existe déjà." };
+      }
+
+      // Crée une invitation admin
+      const token = this.generateSecureToken();
+      const invitationData = {
+        email,
+        role: "ADMIN" as const,
+        status: "pending" as const,
+        targetData: {
+          name,
+        },
+        invitedBy: "SUPER_ADMIN", // Remplace par l'id du super admin courant si besoin
+        invitedAt: serverTimestamp(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        token,
+      };
+
+      await addDoc(collection(db, "invitations"), invitationData);
+
+      return { success: true, token };
+    } catch (error) {
+      return { success: false, error: "Erreur lors de la création de l'admin" };
+    }
+  }
 }

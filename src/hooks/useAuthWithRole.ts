@@ -130,34 +130,38 @@ export function useAuthWithRole() {
   };
 
   // Helpers pour les rôles
-  const isAdmin = useCallback(() => user?.role === 'SUPER_ADMIN', [user]);
+  const isSuperAdmin = useCallback(() => user?.role === 'SUPER_ADMIN', [user]);
+  const isAdmin = useCallback(() => user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN', [user]);
   const isGestionnaire = useCallback(() => user?.role === 'GESTIONNAIRE', [user]);
   const isLocataire = useCallback(() => user?.role === 'LOCATAIRE', [user]);
   const hasRole = useCallback((role: UserRole) => user?.role === role, [user]);
 
-  // Helpers pour les permissions (corrigé pour la nouvelle structure)
+  // Permissions helpers
+  // Seul le super admin peut ajouter un immeuble
+  const canAddImmeuble = useCallback(() => user?.role === 'SUPER_ADMIN', [user]);
+
+  // L'admin (et super admin) a tous les autres droits
   const canAccessImmeuble = useCallback((immeubleId: string) => {
-    if (user?.role === 'SUPER_ADMIN') return true;
+    if (isAdmin()) return true;
     return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
-  }, [user]);
+  }, [user, isAdmin]);
 
   const canAccessComptabilite = useCallback((immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.read, [user]);
+    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.read, [user, isAdmin]);
 
   const canWriteComptabilite = useCallback((immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.write, [user]);
+    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.write, [user, isAdmin]);
 
   const canAccessStatistiques = useCallback((immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.statistiques?.read, [user]);
+    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.statistiques?.read, [user, isAdmin]);
 
   const canDeleteImmeuble = useCallback((immeubleId: string) =>
-    !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble, [user]);
+    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble, [user, isAdmin]);
 
-  // Helper pour la permission gestion_locataires.write
   const canWriteLocataires = useCallback((immeubleId: string) => {
-    if (user?.role === 'SUPER_ADMIN') return true;
+    if (isAdmin()) return true;
     return !!user?.permissions_supplementaires?.[immeubleId]?.gestion_locataires?.write;
-  }, [user]);
+  }, [user, isAdmin]);
 
   return {
     user,
@@ -166,16 +170,18 @@ export function useAuthWithRole() {
     register,
     logout,
     refreshUserData,
+    isSuperAdmin,
     isAdmin,
     isGestionnaire,
     isLocataire,
     hasRole,
     // Helpers permissions
+    canAddImmeuble, // <--- à utiliser UNIQUEMENT pour afficher le bouton d'ajout d'immeuble
     canAccessImmeuble,
     canAccessComptabilite,
     canWriteComptabilite,
     canAccessStatistiques,
     canDeleteImmeuble,
-    canWriteLocataires // <-- Ajouté ici
+    canWriteLocataires
   };
 }

@@ -28,7 +28,7 @@ export function BuildingList() {
   const [editMode, setEditMode] = useState(false);
 
   // Permissions
-  const { canAccessImmeuble, isGestionnaire, user, loading: loadingUser } = useAuthWithRole();
+  const { canAccessImmeuble, isGestionnaire, canAddImmeuble, user, loading: loadingUser, isAdmin, isSuperAdmin } = useAuthWithRole();
 
   // Charger les données initiales
   useEffect(() => {
@@ -103,16 +103,14 @@ export function BuildingList() {
     );
   }
 
-  // Debug temporaire (à retirer en prod)
-  // console.log("User:", user);
-  // console.log("Immeubles assignés:", user?.immeubles_assignes);
-  // console.log("Immeubles chargés:", immeubles.map(im => im.id));
-  // immeubles.forEach(im => {
-  //   console.log(im.id, canAccessImmeuble(im.id));
-  // });
-
   // Filtrer les immeubles par permissions
-  const immeublesAutorises = immeubles.filter(im => canAccessImmeuble(im.id));
+  const immeublesAutorises = isSuperAdmin()
+    ? immeubles
+    : isAdmin()
+      ? immeubles.filter(im =>
+          user?.immeubles_assignes?.some((item: any) => item.id === im.id)
+        )
+      : immeubles.filter(im => canAccessImmeuble(im.id));
 
   // Filtrer les immeubles par terme de recherche
   const immeublesFiltres = immeublesAutorises.filter(immeuble =>
@@ -174,8 +172,8 @@ export function BuildingList() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestion des immeubles</h1>
             <p className="text-gray-600">Gérez vos biens immobiliers et leurs appartements</p>
           </div>
-          {/* Bouton d'ajout visible seulement si NON gestionnaire */}
-          {!isGestionnaire() && (
+          {/* Bouton d'ajout visible seulement pour le super admin */}
+          {canAddImmeuble() && (
             <Button 
               onClick={handleNouvelImmeuble} 
               className="bg-blue-600 hover:bg-blue-700 shadow-sm transition-all duration-200"
@@ -258,7 +256,7 @@ export function BuildingList() {
             <Building2 size={64} className="mx-auto text-gray-300 mb-6" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun immeuble trouvé</h3>
             <p className="text-gray-600 mb-6">Commencez par créer votre premier immeuble</p>
-            {!isGestionnaire() && (
+            {canAddImmeuble() && (
               <Button 
                 onClick={handleNouvelImmeuble} 
                 className="bg-blue-600 hover:bg-blue-700 shadow-sm"
@@ -318,7 +316,7 @@ export function BuildingList() {
                     Détails
                   </Button>
                   {/* Les boutons modifier/supprimer sont cachés pour les gestionnaires */}
-                  {!isGestionnaire() && (
+                  {canAddImmeuble() && (
                     <>
                       <Button 
                         size="sm" 

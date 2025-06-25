@@ -59,19 +59,39 @@ export async function POST(req: NextRequest) {
     // Récupère l'UID du nouvel utilisateur
     const uid = userCredential.user.uid;
 
-    // Crée le document Firestore dans 'users' avec l'UID comme ID
-    await setDoc(doc(db, "users", uid), {
+    // Prépare les données utilisateur selon le rôle
+    let userData: any = {
       name: invitation.targetData.name,
       email: invitation.email,
-      phone: invitation.targetData.phone,
+      phone: invitation.targetData.phone || null,
       role: invitation.role,
-      immeubles_assignes: invitation.targetData.immeubles_assignes,
-      permissions_supplementaires:
-        invitation.targetData.permissions_supplementaires || {},
       status: "active",
       createdAt: new Date(),
       invitedAt: invitation.invitedAt,
-    });
+    };
+
+    if (invitation.role === "GESTIONNAIRE") {
+      userData.immeubles_assignes = invitation.targetData.immeubles_assignes || [];
+      userData.permissions_supplementaires =
+        invitation.targetData.permissions_supplementaires || {};
+    } else if (invitation.role === "ADMIN") {
+      userData.immeubles_assignes = [];
+      userData.permissions_supplementaires = {};
+    } else if (invitation.role === "SUPER_ADMIN") {
+      userData.immeubles_assignes = [];
+      userData.permissions_supplementaires = {};
+    } else if (invitation.role === "LOCATAIRE") {
+      userData.appartementId = invitation.targetData.appartementId || null;
+      userData.canUploadRecus = invitation.targetData.canUploadRecus ?? false;
+    }
+
+    // Nettoie les champs undefined
+    Object.keys(userData).forEach(
+      (key) => userData[key] === undefined && delete userData[key]
+    );
+
+    // Crée le document Firestore dans 'users' avec l'UID comme ID
+    await setDoc(doc(db, "users", uid), userData);
 
     // Met à jour le statut de l'invitation
     await updateDoc(invitationDoc.ref, { status: "accepted" });
