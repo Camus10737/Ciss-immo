@@ -7,7 +7,7 @@ import { getLocataireById } from "@/app/services/locatairesService";
 import { Button } from "@/components/ui/button";
 import { RecuPaiement } from "@/app/types/recus";
 import { Eye, CheckCircle2, XCircle } from "lucide-react";
-import { useAuthWithRole } from "@/hooks/useAuthWithRole"; // Ajout
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 // Utilitaire pour obtenir les mois déjà payés pour un client
 function getPaidMonthsForClient(clientId: string, operations: any[]) {
@@ -85,7 +85,7 @@ export function ValidationRecusAdmin() {
     { year: number; month: number }[]
   >([]);
 
-  const { canWriteComptabilite } = useAuthWithRole(); // Ajout
+  const { canWriteComptabilite } = useAuthWithRole();
 
   const fetchRecus = async () => {
     setLoading(true);
@@ -256,15 +256,18 @@ export function ValidationRecusAdmin() {
     description,
   };
 
+  // Filtrer les reçus selon la permission d'écriture sur la comptabilité de l'immeuble
+  const recusVisibles = recus.filter(recu => canWriteComptabilite(recu.immeubleId));
+
   return (
     <div>
       <h3 className="text-lg font-semibold mb-4">
         Reçus en attente de validation
       </h3>
       {loading && <div>Chargement...</div>}
-      {recus.length === 0 && !loading && <div>Aucun reçu en attente.</div>}
+      {recusVisibles.length === 0 && !loading && <div>Aucun reçu en attente.</div>}
       <ul className="space-y-4">
-        {recus.map((recu) => (
+        {recusVisibles.map((recu) => (
           <li key={recu.id} className="border rounded p-4 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div>
@@ -284,26 +287,22 @@ export function ValidationRecusAdmin() {
                   Voir
                 </Button>
                 {/* Contrôle de permission ici */}
-                {canWriteComptabilite(recu.immeubleId) && (
-                  <>
-                    <Button
-                      onClick={() => openValidationModal(recu)}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      title="Valider"
-                    >
-                      <CheckCircle2 size={16} className="mr-1" />
-                      Valider
-                    </Button>
-                    <Button
-                      onClick={() => handleRefus(recu.id)}
-                      className="bg-red-600 hover:bg-red-700 text-white"
-                      title="Refuser"
-                    >
-                      <XCircle size={16} className="mr-1" />
-                      Refuser
-                    </Button>
-                  </>
-                )}
+                <Button
+                  onClick={() => openValidationModal(recu)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  title="Valider"
+                >
+                  <CheckCircle2 size={16} className="mr-1" />
+                  Valider
+                </Button>
+                <Button
+                  onClick={() => handleRefus(recu.id)}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  title="Refuser"
+                >
+                  <XCircle size={16} className="mr-1" />
+                  Refuser
+                </Button>
               </div>
             </div>
           </li>

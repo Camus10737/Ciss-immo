@@ -12,12 +12,12 @@ import { getLocataires, deleteLocataire, marquerSortieLocataire } from "@/app/se
 import { useAuth } from "@/hooks/useAuth"
 import type { Locataire } from "@/app/types/locataires"
 import { immeublesService } from "@/app/services/immeublesService"
-import { useAuthWithRole } from "@/hooks/useAuthWithRole" // AJOUT
+import { useAuthWithRole } from "@/hooks/useAuthWithRole"
 
 export default function TenantList() {
   const router = useRouter()
   const { user } = useAuth()
-  const { canAccessImmeuble, isGestionnaire } = useAuthWithRole() // AJOUT
+  const { canAccessImmeuble, canWriteLocataires, isGestionnaire } = useAuthWithRole()
 
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [filteredLocataires, setFilteredLocataires] = useState<Locataire[]>([])
@@ -64,13 +64,18 @@ export default function TenantList() {
   useEffect(() => {
     let filtered = [...locataires]
 
-    // 🔒 Filtrer selon les droits du gestionnaire
+    // 🔒 Filtrer selon les droits du gestionnaire (doit avoir write sur gestion_locataires)
     if (isGestionnaire()) {
       filtered = filtered.filter(
-        (locataire) =>
-          locataire.appartementId &&
-          immeubleMap[locataire.appartementId] &&
-          canAccessImmeuble(immeubleMap[locataire.appartementId])
+        (locataire) => {
+          const immeubleId = immeubleMap[locataire.appartementId]
+          return (
+            locataire.appartementId &&
+            immeubleId &&
+            canAccessImmeuble(immeubleId) &&
+            canWriteLocataires(immeubleId)
+          )
+        }
       )
     }
 
@@ -94,7 +99,7 @@ export default function TenantList() {
     }
 
     setFilteredLocataires(filtered)
-  }, [locataires, searchTerm, statutFilter, immeubleMap, canAccessImmeuble, isGestionnaire])
+  }, [locataires, searchTerm, statutFilter, immeubleMap, canAccessImmeuble, canWriteLocataires, isGestionnaire, user])
 
   const handleDeleteLocataire = async (id: string, nom: string, prenom: string) => {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${prenom} ${nom} ?`)) {

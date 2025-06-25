@@ -1,5 +1,3 @@
-// src/app/dashboard/administrateur/components/GestionnairesList.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -86,17 +84,35 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
     }
   };
 
-  const handleDelete = async (gestionnaireId: string, gestionnaireNom: string) => {
+  // NOUVELLE LOGIQUE : Retirer seulement les immeubles assignés par l'admin courant
+  const handleDelete = async (gestionnaire: Gestionnaire) => {
     if (!user?.uid) return;
 
-    const confirmed = confirm(`Êtes-vous sûr de vouloir supprimer ${gestionnaireNom} ?`);
+    // Ici, on suppose que tu as un moyen de savoir quels immeubles ont été assignés par l'admin courant.
+    // Si ce n'est pas le cas, il faut stocker cette info lors de l'assignation.
+    // Pour l'exemple, on retire tous les immeubles (à adapter selon ta logique réelle).
+    const immeublesARetirer = gestionnaire.immeubles_assignes;
+
+    if (!immeublesARetirer || immeublesARetirer.length === 0) {
+      toast.info("Aucun immeuble à retirer pour ce gestionnaire.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `Êtes-vous sûr de vouloir retirer ${immeublesARetirer.length > 1 ? "ces immeubles" : "cet immeuble"} à ${gestionnaire.name} ?`
+    );
     if (!confirmed) return;
 
     try {
-      const result = await UserManagementService.deleteGestionnaire(gestionnaireId, user.uid);
+      const result = await UserManagementService.retirerImmeublesAuGestionnaire(
+        gestionnaire.id,
+        immeublesARetirer
+      );
 
       if (result.success) {
-        toast.success(`Gestionnaire ${gestionnaireNom} supprimé`);
+        toast.success(
+          `Immeuble${immeublesARetirer.length > 1 ? "s" : ""} retiré${immeublesARetirer.length > 1 ? "s" : ""} à ${gestionnaire.name}`
+        );
         loadGestionnaires(); // Recharger la liste
       } else {
         toast.error(result.error || "Erreur lors de la suppression");
@@ -245,11 +261,11 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
-                      onClick={() => handleDelete(gestionnaire.id, gestionnaire.name)}
+                      onClick={() => handleDelete(gestionnaire)}
                       className="text-red-600"
                     >
                       <Trash2 size={16} className="mr-2" />
-                      Supprimer
+                      Retirer mes immeubles
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

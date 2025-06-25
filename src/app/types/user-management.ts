@@ -1,5 +1,3 @@
-// src/types/user-management.ts
-
 /**
 RÔLES UTILISATEURS
  */
@@ -15,14 +13,19 @@ export interface Permission {
 }
 
 export interface ImmeublePermissions {
-  // Permissions automatiques 
-  gestion_immeuble: Permission; 
-  gestion_locataires: Permission; 
-  
-  // Permissions manuelles 
-  comptabilite: Permission;
-  statistiques: { read: boolean; export: boolean }; 
-  delete_immeuble: boolean; 
+  gestion_immeuble: Permission;
+  gestion_locataires: Permission;
+  comptabilite: { read: boolean; write: boolean; export: boolean };
+  statistiques: { read: boolean; export: boolean };
+  delete_immeuble: boolean;
+}
+
+/**
+ * NOUVEAU TYPE pour l'assignation d'un immeuble à un gestionnaire
+ */
+export interface ImmeubleAssignment {
+  id: string; // id de l'immeuble
+  assignedBy: string; // id de l'admin qui a assigné
 }
 
 /**
@@ -32,7 +35,7 @@ export interface User {
   id: string;
   email: string;
   role: UserRole;
-  status: 'active' | 'inactive' | 'pending'; 
+  status: 'active' | 'inactive' | 'pending';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,16 +56,15 @@ export interface Gestionnaire extends User {
   role: 'GESTIONNAIRE';
   name: string;
   phone?: string;
-  
-  // Immeubles assignés
-  immeubles_assignes: string[]; 
+
+  // Immeubles assignés (corrigé)
+  immeubles_assignes: ImmeubleAssignment[];
   // Permissions par immeuble
   permissions_supplementaires: {
     [immeubleId: string]: ImmeublePermissions;
   };
-  
-  // Invitation
-  invitedBy: string; 
+
+  invitedBy: string;
   invitedAt: Date;
   lastLogin?: Date;
 }
@@ -73,9 +75,7 @@ export interface Gestionnaire extends User {
 export interface LocataireUser extends User {
   role: 'LOCATAIRE';
   name: string;
-  appartementId: string; 
-  
-  // Pas de permissions, juste upload de reçus
+  appartementId: string;
   canUploadRecus: boolean;
 }
 
@@ -89,14 +89,17 @@ export interface Invitation {
   targetData: {
     name: string;
     phone?: string;
-    immeubles_assignes?: string[]; 
-    appartementId?: string; 
+    immeubles_assignes?: ImmeubleAssignment[];
+    appartementId?: string;
+    permissions_supplementaires?: {
+      [immeubleId: string]: ImmeublePermissions;
+    };
   };
-  invitedBy: string; 
+  invitedBy: string;
   invitedAt: Date;
   expiresAt: Date;
   status: 'pending' | 'accepted' | 'expired';
-  token: string; 
+  token: string;
 }
 
 /**
@@ -106,16 +109,9 @@ export interface CreateGestionnaireFormData {
   name: string;
   email: string;
   phone?: string;
-  immeubles_assignes: string[];
+  immeubles_assignes: ImmeubleAssignment[];
   permissions_supplementaires: {
-    [immeubleId: string]: {
-      
-      
-      // Permissions manuelles (choisies par SUPER_ADMIN)
-      comptabilite: { read: boolean; write: boolean; export: boolean };
-      statistiques: { read: boolean; export: boolean };
-      delete_immeuble: boolean;
-    };
+    [immeubleId: string]: ImmeublePermissions;
   };
 }
 
@@ -131,7 +127,7 @@ export interface CreateLocataireUserFormData {
 export interface UserFilters {
   role?: UserRole;
   status?: 'active' | 'inactive' | 'pending';
-  immeubleId?: string; 
+  immeubleId?: string;
 }
 
 /**
@@ -160,7 +156,7 @@ export interface UserManagementState {
 }
 
 /**
-  ASSIGNATION D'IMMEUBLES
+  ASSIGNATION D'IMMEUBLES (pour affichage)
  */
 export interface ImmeubleAssignmentData {
   immeubleId: string;
@@ -176,9 +172,9 @@ export interface GestionnaireWithImmeubles extends Gestionnaire {
 /**
   ACTIONS UTILISATEUR
  */
-export type UserAction = 
+export type UserAction =
   | 'CREATE_GESTIONNAIRE'
-  | 'UPDATE_GESTIONNAIRE' 
+  | 'UPDATE_GESTIONNAIRE'
   | 'DELETE_GESTIONNAIRE'
   | 'ASSIGN_IMMEUBLE'
   | 'UPDATE_PERMISSIONS'

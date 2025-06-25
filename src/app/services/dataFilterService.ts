@@ -1,5 +1,3 @@
-// src/services/dataFilterService.ts
-
 import { 
   collection, 
   doc, 
@@ -67,21 +65,23 @@ export class DataFilterService {
           );
           break;
 
-        case 'GESTIONNAIRE':
+        case 'GESTIONNAIRE': {
           const gestionnaire = user as Gestionnaire;
-          // Gestionnaire voit seulement ses immeubles assignés
-          if (gestionnaire.immeubles_assignes && gestionnaire.immeubles_assignes.length > 0) {
+          // Correction : extraire les ids
+          const immeubleIds = (gestionnaire.immeubles_assignes || []).map(item => item.id);
+          if (immeubleIds.length > 0) {
             q = query(
               collection(db, 'immeubles'),
-              where('id', 'in', gestionnaire.immeubles_assignes.slice(0, 10)), // Firestore limite à 10
+              where('id', 'in', immeubleIds.slice(0, 10)), // Firestore limite à 10
               orderBy('createdAt', 'desc')
             );
           } else {
             return []; // Aucun immeuble assigné
           }
           break;
+        }
 
-        case 'LOCATAIRE':
+        case 'LOCATAIRE': {
           const locataire = user as LocataireUser;
           // Locataire voit seulement son immeuble (via appartementId)
           const appartement = await this.getAppartementById(locataire.appartementId);
@@ -92,6 +92,7 @@ export class DataFilterService {
             where('id', '==', appartement.immeubleId)
           );
           break;
+        }
 
         default:
           return [];
@@ -130,10 +131,11 @@ export class DataFilterService {
           );
           break;
 
-        case 'GESTIONNAIRE':
+        case 'GESTIONNAIRE': {
           // Gestionnaire voit seulement les locataires de SES immeubles
           const gestionnaire = user as Gestionnaire;
-          const gestionnaireImmeubles = gestionnaire.immeubles_assignes || [];
+          // Correction : extraire les ids
+          const gestionnaireImmeubles = (gestionnaire.immeubles_assignes || []).map(item => item.id);
           
           if (gestionnaireImmeubles.length === 0) return [];
           
@@ -148,6 +150,7 @@ export class DataFilterService {
             orderBy('createdAt', 'desc')
           );
           break;
+        }
 
         case 'LOCATAIRE':
           // Locataire voit seulement ses propres données
@@ -208,10 +211,11 @@ export class DataFilterService {
               );
           break;
 
-        case 'GESTIONNAIRE':
+        case 'GESTIONNAIRE': {
           // Gestionnaire voit les appartements de SES immeubles
           const gestionnaire = user as Gestionnaire;
-          const gestionnaireImmeubles = gestionnaire.immeubles_assignes || [];
+          // Correction : extraire les ids
+          const gestionnaireImmeubles = (gestionnaire.immeubles_assignes || []).map(item => item.id);
           
           if (immeubleId) {
             // Vérifier que le gestionnaire a accès à cet immeuble
@@ -233,8 +237,9 @@ export class DataFilterService {
             );
           }
           break;
+        }
 
-        case 'LOCATAIRE':
+        case 'LOCATAIRE': {
           const locataire = user as LocataireUser;
           // Locataire voit seulement son appartement
           q = query(
@@ -242,6 +247,7 @@ export class DataFilterService {
             where('id', '==', locataire.appartementId)
           );
           break;
+        }
 
         default:
           return [];
@@ -268,24 +274,24 @@ export class DataFilterService {
     try {
       const user = await this.getUserById(userId);
       if (!user) return false;
-
+  
       switch (user.role) {
         case 'SUPER_ADMIN':
-          return true; // SUPER_ADMIN a accès à tout
-
+          return true; 
+  
         case 'GESTIONNAIRE':
           const gestionnaire = user as Gestionnaire;
-          return gestionnaire.immeubles_assignes?.includes(immeubleId) || false;
-
+          return gestionnaire.immeubles_assignes?.some((item: any) => item.id === immeubleId) || false;
+  
         case 'LOCATAIRE':
           const locataire = user as LocataireUser;
           const appartement = await this.getAppartementById(locataire.appartementId);
           return appartement?.immeubleId === immeubleId;
-
+  
         default:
           return false;
       }
-
+  
     } catch (error) {
       console.error('Erreur vérification accès immeuble:', error);
       return false;

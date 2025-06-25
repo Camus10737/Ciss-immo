@@ -9,7 +9,7 @@ export function ListeRapportsFinanciers({ refresh, immeubles }: { refresh: numbe
   const [rapports, setRapports] = useState<any[]>([]);
   const [selectedRapport, setSelectedRapport] = useState<any | null>(null);
 
-  const { canDeleteImmeuble } = useAuthWithRole();
+  const { canDeleteImmeuble, canAccessImmeuble, isAdmin } = useAuthWithRole();
 
   const refreshList = () => getRapportsAnnuels().then(setRapports);
 
@@ -24,14 +24,21 @@ export function ListeRapportsFinanciers({ refresh, immeubles }: { refresh: numbe
     }
   };
 
-  if (!rapports.length) {
+  // Filtrer les rapports selon la permission d'accès à l'immeuble
+  const rapportsVisibles = rapports.filter(r =>
+    !r.immeubleId ||
+    isAdmin() ||
+    canAccessImmeuble(r.immeubleId)
+  );
+
+  if (!rapportsVisibles.length) {
     return <div className="text-gray-500">Aucun rapport disponible.</div>;
   }
 
   return (
     <div>
       <ul className="divide-y border rounded bg-white">
-        {rapports.map((r) => (
+        {rapportsVisibles.map((r) => (
           <li
             key={r.id}
             className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 transition group"

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fr } from "date-fns/locale";
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 interface DepenseManuelle {
   client: string;
@@ -38,6 +39,9 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
   const [montantFilter, setMontantFilter] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [openDatePopover, setOpenDatePopover] = useState(false);
+
+  // Permissions
+  const { canAccessComptabilite } = useAuthWithRole();
 
   // Recharge les dépenses Firestore à chaque changement de refresh
   useEffect(() => {
@@ -72,6 +76,15 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
     };
     fetchRecus();
   }, []);
+
+  // Vérification de la permission d'accès à la comptabilité de l'immeuble
+  if (immeubleId && !canAccessComptabilite(immeubleId)) {
+    return (
+      <div className="text-red-600 font-semibold p-4">
+        Vous n'avez pas la permission de voir la comptabilité de cet immeuble.
+      </div>
+    );
+  }
 
   // Filtrage selon l'immeuble sélectionné
   const filteredRecus = immeubleId

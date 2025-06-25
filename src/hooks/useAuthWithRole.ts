@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Gestionnaire, LocataireUser, SuperAdmin, UserRole } from '@/app/types/user-management';
+import { Gestionnaire, LocataireUser, SuperAdmin, UserRole, ImmeubleAssignment } from '@/app/types/user-management';
 
 export interface ExtendedUser {
   uid: string;
@@ -18,7 +18,7 @@ export interface ExtendedUser {
   name?: string;
   phone?: string;
   status?: 'active' | 'inactive' | 'pending';
-  immeubles_assignes?: string[];
+  immeubles_assignes?: ImmeubleAssignment[];
   permissions_supplementaires?: Record<string, any>;
   userData?: SuperAdmin | Gestionnaire | LocataireUser;
 }
@@ -33,8 +33,6 @@ export function useAuthWithRole() {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        // Debug temporaire
-        console.log("Firestore userDoc:", userData);
         return {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -55,9 +53,6 @@ export function useAuthWithRole() {
           } as SuperAdmin | Gestionnaire | LocataireUser
         };
       } else {
-        // Debug temporaire
-        console.warn("Aucun document Firestore trouvé pour l'utilisateur", firebaseUser.uid);
-        // Utilisateur Firebase Auth mais pas dans Firestore
         return {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -140,10 +135,10 @@ export function useAuthWithRole() {
   const isLocataire = useCallback(() => user?.role === 'LOCATAIRE', [user]);
   const hasRole = useCallback((role: UserRole) => user?.role === role, [user]);
 
-  // Helpers pour les permissions (mémorisés !)
+  // Helpers pour les permissions (corrigé pour la nouvelle structure)
   const canAccessImmeuble = useCallback((immeubleId: string) => {
     if (user?.role === 'SUPER_ADMIN') return true;
-    return !!user?.immeubles_assignes?.includes(immeubleId);
+    return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
   }, [user]);
 
   const canAccessComptabilite = useCallback((immeubleId: string) =>
@@ -157,6 +152,12 @@ export function useAuthWithRole() {
 
   const canDeleteImmeuble = useCallback((immeubleId: string) =>
     !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble, [user]);
+
+  // Helper pour la permission gestion_locataires.write
+  const canWriteLocataires = useCallback((immeubleId: string) => {
+    if (user?.role === 'SUPER_ADMIN') return true;
+    return !!user?.permissions_supplementaires?.[immeubleId]?.gestion_locataires?.write;
+  }, [user]);
 
   return {
     user,
@@ -174,6 +175,7 @@ export function useAuthWithRole() {
     canAccessComptabilite,
     canWriteComptabilite,
     canAccessStatistiques,
-    canDeleteImmeuble
+    canDeleteImmeuble,
+    canWriteLocataires // <-- Ajouté ici
   };
 }

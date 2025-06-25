@@ -18,13 +18,11 @@ import {
   ImmeublePermissions, 
   LocataireUser, 
   SuperAdmin, 
-  UserFilters 
+  UserFilters,
+  ImmeubleAssignment
 } from '@/app/types/user-management';
 import { InvitationService } from "@/app/services/invitationService";
 
-/**
- GESTION DES UTILISATEURS
- */
 export class UserManagementService {
 
   static async getUserById(userId: string): Promise<SuperAdmin | Gestionnaire | LocataireUser | null> {
@@ -80,21 +78,48 @@ export class UserManagementService {
     }
   }
 
-  // CORRIGÉ : Crée uniquement une invitation, pas de doc dans 'users'
+  // Ajoute immeuble si email existe, sinon invitation
   static async createGestionnaire(
     superAdminId: string, 
     formData: CreateGestionnaireFormData
-  ): Promise<{ success: boolean; token?: string; error?: string }> {
+  ): Promise<{ success: boolean; token?: string; alreadyExists?: boolean; error?: string }> {
     try {
-      const existingUser = await this.getUserByEmail(formData.email);
-      if (existingUser) {
-        return { success: false, error: 'Un utilisateur avec cet email existe déjà' };
+      // Vérifie si un utilisateur existe déjà avec cet email
+      const q = query(collection(db, "users"), where("email", "==", formData.email));
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        // L'utilisateur existe déjà, on met à jour ses immeubles_assignes
+        const userDoc = snapshot.docs[0];
+        const userData = userDoc.data();
+        const currentImmeubles: ImmeubleAssignment[] = Array.isArray(userData.immeubles_assignes) ? userData.immeubles_assignes : [];
+        // Ajoute le(s) nouvel(s) immeuble(s) sans doublon (fusion par id)
+        const newImmeubles: ImmeubleAssignment[] = [
+          ...currentImmeubles,
+          ...formData.immeubles_assignes.filter(
+            (newItem) => !currentImmeubles.some((item) => item.id === newItem.id)
+          ),
+        ];
+
+        // Fusionne les permissions pour chaque immeuble
+        const currentPermissions = userData.permissions_supplementaires || {};
+        const newPermissions = { ...currentPermissions };
+        for (const assignment of formData.immeubles_assignes) {
+          newPermissions[assignment.id] = formData.permissions_supplementaires[assignment.id];
+        }
+
+        await updateDoc(doc(db, "users", userDoc.id), {
+          immeubles_assignes: newImmeubles,
+          permissions_supplementaires: newPermissions,
+          updatedAt: serverTimestamp(),
+        });
+
+        return { success: true, alreadyExists: true };
       }
 
-      // Génère le token UNE SEULE FOIS
+      // Sinon, on crée une invitation comme avant
       const token = this.generateSecureToken();
 
-      // Créer l'invitation en base avec ce token
       const invitationData = {
         email: formData.email,
         role: 'GESTIONNAIRE' as const,
@@ -108,12 +133,10 @@ export class UserManagementService {
         invitedBy: superAdminId,
         invitedAt: serverTimestamp(),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
-        token // <-- même token partout
+        token
       };
 
       await addDoc(collection(db, 'invitations'), invitationData);
-
-      // NE PAS créer de document dans 'users' ici !
 
       return { success: true, token };
 
@@ -145,8 +168,14 @@ export class UserManagementService {
       if (updates.immeubles_assignes) {
         const oldGestionnaire = await this.getUserById(gestionnaireId) as Gestionnaire;
         if (oldGestionnaire) {
-          await this.unassignImmeubles(oldGestionnaire.immeubles_assignes, gestionnaireId);
-          await this.assignImmeubles(updates.immeubles_assignes, gestionnaireId);
+          await this.unassignImmeubles(
+            oldGestionnaire.immeubles_assignes.map(a => a.id),
+            gestionnaireId
+          );
+          await this.assignImmeubles(
+            updates.immeubles_assignes.map(a => a.id),
+            gestionnaireId
+          );
         }
       }
 
@@ -214,41 +243,43 @@ export class UserManagementService {
     }
   }
 
-  static async deleteGestionnaire(
+  /**
+   * Retire uniquement les immeubles spécifiés d'un gestionnaire
+   * (et met à jour les permissions associées)
+   */
+  static async retirerImmeublesAuGestionnaire(
     gestionnaireId: string,
-    performedBy: string
+    immeublesARetirer: string[]
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const gestionnaire = await this.getUserById(gestionnaireId) as Gestionnaire;
-      if (!gestionnaire) {
-        return { success: false, error: 'Gestionnaire introuvable' };
+      const gestionnaireRef = doc(db, "users", gestionnaireId);
+      const gestionnaireSnap = await getDoc(gestionnaireRef);
+      if (!gestionnaireSnap.exists()) {
+        return { success: false, error: "Gestionnaire introuvable" };
+      }
+      const gestionnaire = gestionnaireSnap.data();
+
+      // 1. Retirer les immeubles (filtrer sur .id)
+      const newImmeubles = (gestionnaire.immeubles_assignes || []).filter(
+        (item: any) => !immeublesARetirer.includes(item.id)
+      );
+      // 2. Retirer les permissions associées
+      const newPermissions: any = {};
+      for (const item of newImmeubles) {
+        if (gestionnaire.permissions_supplementaires?.[item.id]) {
+          newPermissions[item.id] = gestionnaire.permissions_supplementaires[item.id];
+        }
       }
 
-      await this.unassignImmeubles(gestionnaire.immeubles_assignes, gestionnaireId);
-
-      await deleteDoc(doc(db, 'users', gestionnaireId));
-
-      const performer = await this.getUserById(performedBy);
-      const logData = {
-        action: 'USER_DELETED' as const,
-        performedBy: performedBy,
-        performedByName: performer?.name || 'Utilisateur inconnu',
-        targetUserId: gestionnaireId,
-        targetUserName: gestionnaire.name,
-        details: {
-          role: 'GESTIONNAIRE',
-          immeubles: gestionnaire.immeubles_assignes,
-          email: gestionnaire.email
-        },
-        timestamp: serverTimestamp()
-      };
-
-      await addDoc(collection(db, 'activity_logs'), logData);
+      await updateDoc(gestionnaireRef, {
+        immeubles_assignes: newImmeubles,
+        permissions_supplementaires: newPermissions,
+        updatedAt: serverTimestamp(),
+      });
 
       return { success: true };
-
-    } catch (error) {
-      return { success: false, error: 'Erreur lors de la suppression' };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   }
 
@@ -338,11 +369,11 @@ export class UserManagementService {
 
     for (const [immeubleId, permissions] of Object.entries(formPermissions)) {
       completePermissions[immeubleId] = {
-        gestion_immeuble: { read: true, write: true },
-        gestion_locataires: { read: true, write: true },
-        comptabilite: permissions.comptabilite,
-        statistiques: permissions.statistiques,
-        delete_immeuble: permissions.delete_immeuble
+        gestion_immeuble: permissions.gestion_immeuble ?? { read: false, write: false },
+        gestion_locataires: permissions.gestion_locataires ?? { read: false, write: false },
+        comptabilite: permissions.comptabilite ?? { read: false, write: false, export: false },
+        statistiques: permissions.statistiques ?? { read: false, export: false },
+        delete_immeuble: permissions.delete_immeuble ?? false
       };
     }
 

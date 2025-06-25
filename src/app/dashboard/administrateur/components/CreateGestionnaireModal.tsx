@@ -31,7 +31,10 @@ import {
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Immeuble } from "@/app/types";
 import { DataFilterService } from "@/app/services/dataFilterService";
-import { CreateGestionnaireFormData } from "@/app/types/user-management";
+import {
+  CreateGestionnaireFormData,
+  ImmeubleAssignment,
+} from "@/app/types/user-management";
 import { UserManagementService } from "@/app/services/userManagementService";
 
 interface CreateGestionnaireModalProps {
@@ -80,21 +83,35 @@ export function CreateGestionnaireModal({
     }
   }, [isOpen]);
 
+  // Correction : gestion des immeubles assignés avec {id, assignedBy}
   const handleImmeubleToggle = (immeubleId: string) => {
     setFormData((prev) => {
-      const newAssignments = prev.immeubles_assignes.includes(immeubleId)
-        ? prev.immeubles_assignes.filter((id) => id !== immeubleId)
-        : [...prev.immeubles_assignes, immeubleId];
+      const isAssigned = prev.immeubles_assignes.some(
+        (item) => item.id === immeubleId
+      );
+      let newAssignments: ImmeubleAssignment[];
+      if (isAssigned) {
+        newAssignments = prev.immeubles_assignes.filter(
+          (item) => item.id !== immeubleId
+        );
+      } else {
+        newAssignments = [
+          ...prev.immeubles_assignes,
+          { id: immeubleId, assignedBy: user?.uid || "" },
+        ];
+      }
 
       // Initialiser ou supprimer les permissions pour cet immeuble
       const newPermissions = { ...prev.permissions_supplementaires };
-      if (newAssignments.includes(immeubleId) && !newPermissions[immeubleId]) {
+      if (!isAssigned && !newPermissions[immeubleId]) {
         newPermissions[immeubleId] = {
+          gestion_immeuble: { read: false, write: false },
+          gestion_locataires: { read: false, write: false },
           comptabilite: { read: false, write: false, export: false },
           statistiques: { read: false, export: false },
           delete_immeuble: false,
         };
-      } else if (!newAssignments.includes(immeubleId)) {
+      } else if (isAssigned) {
         delete newPermissions[immeubleId];
       }
 
@@ -122,7 +139,7 @@ export function CreateGestionnaireModal({
             category === "delete_immeuble"
               ? value
               : {
-                  ...prev.permissions_supplementaires[immeubleId][category],
+                  ...prev.permissions_supplementaires[immeubleId]?.[category],
                   [permission]: value,
                 },
         },
@@ -157,8 +174,18 @@ export function CreateGestionnaireModal({
       );
 
       if (result.success) {
+        if (result.alreadyExists) {
+          toast.success(
+            `Le gestionnaire existe déjà, ses immeubles ont été mis à jour.`
+          );
+          onSuccess();
+          onClose();
+          setLoading(false);
+          return;
+        }
+
         // Vérifie que le token existe
-        const token = result.gestionnaire?.token;
+        const token = result.token;
         if (!token) {
           toast.error("Le token d'invitation est manquant.");
           setLoading(false);
@@ -171,7 +198,7 @@ export function CreateGestionnaireModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: formData.email,
-            token, // <-- juste le token, pas d'URL ici
+            token,
             role: "GESTIONNAIRE",
           }),
         });
@@ -288,8 +315,8 @@ export function CreateGestionnaireModal({
                       <CardContent className="p-4">
                         <div className="flex items-start space-x-4">
                           <Checkbox
-                            checked={formData.immeubles_assignes.includes(
-                              immeuble.id
+                            checked={formData.immeubles_assignes.some(
+                              (item) => item.id === immeuble.id
                             )}
                             onCheckedChange={() =>
                               handleImmeubleToggle(immeuble.id)
@@ -311,8 +338,8 @@ export function CreateGestionnaireModal({
                             </div>
 
                             {/* Permissions pour cet immeuble */}
-                            {formData.immeubles_assignes.includes(
-                              immeuble.id
+                            {formData.immeubles_assignes.some(
+                              (item) => item.id === immeuble.id
                             ) && (
                               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                                 <h5 className="font-medium text-gray-900 mb-3 flex items-center">
@@ -320,9 +347,118 @@ export function CreateGestionnaireModal({
                                     size={16}
                                     className="mr-2 text-indigo-600"
                                   />
-                                  Permissions spéciales
+                                  Permissions détaillées
                                 </h5>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Gestion immeuble */}
+                                  <div>
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <Building2
+                                        size={16}
+                                        className="text-blue-600"
+                                      />
+                                      <span className="font-medium text-sm">
+                                        Gestion immeuble
+                                      </span>
+                                    </div>
+                                    <div className="space-y-2 ml-6">
+                                      <label className="flex items-center space-x-2">
+                                        <Checkbox
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.gestion_immeuble?.read || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "gestion_immeuble",
+                                              "read",
+                                              !!checked
+                                            )
+                                          }
+                                        />
+                                        <span className="text-sm">Voir</span>
+                                      </label>
+                                      <label className="flex items-center space-x-2">
+                                        <Checkbox
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.gestion_immeuble?.write || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "gestion_immeuble",
+                                              "write",
+                                              !!checked
+                                            )
+                                          }
+                                        />
+                                        <span className="text-sm">
+                                          Modifier
+                                        </span>
+                                      </label>
+                                    </div>
+                                  </div>
+                                  {/* Gestion locataires */}
+                                  <div>
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <User
+                                        size={16}
+                                        className="text-green-600"
+                                      />
+                                      <span className="font-medium text-sm">
+                                        Gestion locataires
+                                      </span>
+                                    </div>
+                                    <div className="space-y-2 ml-6">
+                                      <label className="flex items-center space-x-2">
+                                        <Checkbox
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.gestion_locataires?.read || false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "gestion_locataires",
+                                              "read",
+                                              !!checked
+                                            )
+                                          }
+                                        />
+                                        <span className="text-sm">Voir</span>
+                                      </label>
+                                      <label className="flex items-center space-x-2">
+                                        <Checkbox
+                                          checked={
+                                            formData
+                                              .permissions_supplementaires[
+                                              immeuble.id
+                                            ]?.gestion_locataires?.write ||
+                                            false
+                                          }
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(
+                                              immeuble.id,
+                                              "gestion_locataires",
+                                              "write",
+                                              !!checked
+                                            )
+                                          }
+                                        />
+                                        <span className="text-sm">
+                                          Modifier
+                                        </span>
+                                      </label>
+                                    </div>
+                                  </div>
                                   {/* Comptabilité */}
                                   <div>
                                     <div className="flex items-center space-x-2 mb-2">
@@ -398,7 +534,6 @@ export function CreateGestionnaireModal({
                                       </label>
                                     </div>
                                   </div>
-
                                   {/* Statistiques */}
                                   <div>
                                     <div className="flex items-center space-x-2 mb-2">
@@ -454,7 +589,6 @@ export function CreateGestionnaireModal({
                                     </div>
                                   </div>
                                 </div>
-
                                 {/* Permission spéciale : Supprimer immeuble */}
                                 <Separator className="my-3" />
                                 <label className="flex items-center space-x-2">

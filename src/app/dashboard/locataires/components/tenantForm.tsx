@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth"
 import type { LocataireFormData } from "@/app/types/locataires"
 import { immeublesService } from "@/app/services/immeublesService"
 import type { Immeuble } from "@/app/types"
-import { useAuthWithRole } from "@/hooks/useAuthWithRole" // AJOUT
+import { useAuthWithRole } from "@/hooks/useAuthWithRole"
 
 interface TenantFormProps {
   initialData?: Partial<LocataireFormData>
@@ -26,7 +26,7 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const { canAccessImmeuble, isGestionnaire } = useAuthWithRole() // AJOUT
+  const { canAccessImmeuble, canWriteLocataires, isGestionnaire } = useAuthWithRole()
 
   // Récupérer les paramètres URL
   const appartementIdFromUrl = searchParams.get('appartementId')
@@ -55,23 +55,28 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
     immeubleNom: string;
   } | null>(null)
 
-  // Charger tous les immeubles puis filtrer selon les droits
+  // Charger tous les immeubles puis filtrer selon les droits réels (write sur gestion_locataires)
   useEffect(() => {
     const chargerImmeubles = async () => {
       try {
-        const result = await immeublesService.obtenirImmeubles()
+        const result = await immeublesService.obtenirImmeubles();
         if (result.success && result.data) {
-          setImmeubles(result.data.filter(im => canAccessImmeuble(im.id)))
+          setImmeubles(
+            result.data.filter(im =>
+              canAccessImmeuble(im.id) &&
+              canWriteLocataires(im.id)
+            )
+          );
         }
       } catch (error) {
-        console.error("Erreur lors du chargement des immeubles:", error)
+        console.error("Erreur lors du chargement des immeubles:", error);
       } finally {
-        setLoadingImmeubles(false)
+        setLoadingImmeubles(false);
       }
-    }
+    };
     chargerImmeubles()
     // eslint-disable-next-line
-  }, [])
+  }, [user, canAccessImmeuble, canWriteLocataires])
 
   // Gérer l'appartement pré-sélectionné depuis l'URL
   useEffect(() => {
@@ -148,7 +153,7 @@ export default function TenantForm({ initialData, isEditing = false, locataireId
     }
   }
 
-  // 🔒 Bloque l'accès si le gestionnaire n'a aucun immeuble autorisé
+  // 🔒 Bloque l'accès si le gestionnaire n'a aucun immeuble autorisé (write sur gestion_locataires)
   if (isGestionnaire() && !loadingImmeubles && immeubles.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
