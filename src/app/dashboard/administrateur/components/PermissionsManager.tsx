@@ -25,14 +25,15 @@ import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Gestionnaire } from "@/app/types/user-management";
 import { Immeuble } from "@/app/types/index";
 import { BuildingDetail } from "../../immeubles/buildingDetail";
-import { EditPermissionsModal } from "./EditPermissionsModal"; // 🆕 Import de la nouvelle modal
+import { EditPermissionsModal } from "./EditPermissionsModal";
 import { toast } from "sonner";
 
 interface PermissionsManagerProps {
   refreshKey: number;
 }
 
-export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
+// Correction : export par défaut pour correspondre à l'import default
+export default function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
   const { user } = useAuthWithRole();
   const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
   const [immeubles, setImmeubles] = useState<Immeuble[]>([]);
@@ -68,7 +69,7 @@ export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
 
   const getImmeubleNom = (immeubleId: string) => {
     const immeuble = immeubles.find(i => i.id === immeubleId);
-    return immeuble?.nom || `Immeuble ${immeubleId.slice(0, 8)}`;
+    return immeuble?.nom || `Immeuble ${typeof immeubleId === "string" ? immeubleId.slice(0, 8) : ""}`;
   };
 
   const getImmeuble = (immeubleId: string) => {
@@ -112,7 +113,7 @@ export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
     );
   };
 
-  // 🆕 Gestion du succès de modification des permissions
+  // Gestion du succès de modification des permissions
   const handlePermissionsSuccess = () => {
     loadData(); // Recharger les données
     setSelectedGestionnaire(null); // Fermer la modal
@@ -254,7 +255,6 @@ export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
                   <div className="space-y-3">
                     {gestionnaire.immeubles_assignes.map((immeubleId) => {
                       const permissions = gestionnaire.permissions_supplementaires?.[immeubleId];
-                      
                       return (
                         <div key={immeubleId} className="bg-gray-50 rounded-lg p-4">
                           <div className="flex justify-between items-start mb-3">
@@ -270,7 +270,7 @@ export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
                               </p>
                             </button>
                             <Badge variant="outline" className="text-xs">
-                              ID: {immeubleId.slice(0, 8)}...
+                              ID: {typeof immeubleId === "string" ? immeubleId.slice(0, 8) : ""}
                             </Badge>
                           </div>
 
@@ -352,7 +352,7 @@ export function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
         ))}
       </div>
 
-      {/* 🆕 Modal de modification des permissions - remplace l'ancien TODO */}
+      {/* Modal de modification des permissions */}
       <EditPermissionsModal
         gestionnaire={selectedGestionnaire}
         immeubles={immeubles}

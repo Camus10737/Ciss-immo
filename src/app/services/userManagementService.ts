@@ -244,6 +244,52 @@ export class UserManagementService {
   }
 
   /**
+   * Met à jour à la fois la liste des immeubles assignés et les permissions d'un gestionnaire.
+   */
+  static async updateGestionnaireImmeublesEtPermissions(
+    gestionnaireId: string,
+    immeublesAssignes: string[],
+    permissions: { [immeubleId: string]: any },
+    performedBy: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const gestionnaireRef = doc(db, 'users', gestionnaireId);
+
+      // On stocke les immeubles assignés comme [{id: ...}]
+      const immeublesAssignesObj = immeublesAssignes.map(id => ({ id }));
+
+      // On complète les permissions pour chaque immeuble
+      const completePermissions = this.buildCompletePermissions(permissions);
+
+      await updateDoc(gestionnaireRef, {
+        immeubles_assignes: immeublesAssignesObj,
+        permissions_supplementaires: completePermissions,
+        updatedAt: serverTimestamp()
+      });
+
+      // Log d'activité
+      const performer = await this.getUserById(performedBy);
+      const logData = {
+        action: 'IMMEUBLES_PERMISSIONS_UPDATED' as const,
+        performedBy: performedBy,
+        performedByName: performer?.name || 'Utilisateur inconnu',
+        targetUserId: gestionnaireId,
+        details: {
+          immeublesAssignes: immeublesAssignes,
+          permissionsCount: Object.keys(permissions).length
+        },
+        timestamp: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'activity_logs'), logData);
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Erreur lors de la mise à jour des immeubles et permissions' };
+    }
+  }
+
+  /**
    * Retire uniquement les immeubles spécifiés d'un gestionnaire
    * (et met à jour les permissions associées)
    */

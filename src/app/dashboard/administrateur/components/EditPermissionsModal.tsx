@@ -1,5 +1,3 @@
-// src/app/dashboard/administrateur/components/EditPermissionsModal.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,7 +16,8 @@ import {
   Trash2,
   CheckCircle,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  Plus
 } from "lucide-react";
 import { UserManagementService } from "@/app/services/userManagementService";
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
@@ -41,47 +40,42 @@ export function EditPermissionsModal({
   onClose, 
   onSuccess 
 }: EditPermissionsModalProps) {
-  const { user } = useAuthWithRole();
+  const { user, isAdmin } = useAuthWithRole();
   const [loading, setLoading] = useState(false);
   const [permissions, setPermissions] = useState<{ [immeubleId: string]: ImmeublePermissions }>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [immeublesAssignes, setImmeublesAssignes] = useState<string[]>([]);
+  const [selectedImmeuble, setSelectedImmeuble] = useState<string>("");
 
   // Charger les permissions actuelles quand le gestionnaire change
   useEffect(() => {
     if (gestionnaire && isOpen) {
       const currentPermissions: { [immeubleId: string]: ImmeublePermissions } = {};
-      
       gestionnaire.immeubles_assignes.forEach(immeubleId => {
         const existingPermissions = gestionnaire.permissions_supplementaires?.[immeubleId];
-        
         currentPermissions[immeubleId] = {
-          // Permissions automatiques (toujours actives)
           gestion_immeuble: { read: true, write: true },
           gestion_locataires: { read: true, write: true },
-          
-          // Permissions configurables
           comptabilite: existingPermissions?.comptabilite || { read: false, write: false, export: false },
           statistiques: existingPermissions?.statistiques || { read: false, export: false },
           delete_immeuble: existingPermissions?.delete_immeuble || false
         };
       });
-
       setPermissions(currentPermissions);
+      setImmeublesAssignes([...gestionnaire.immeubles_assignes]);
       setHasChanges(false);
     }
   }, [gestionnaire, isOpen]);
 
   const getImmeubleNom = (immeubleId: string) => {
     const immeuble = immeubles.find(i => i.id === immeubleId);
-    return immeuble?.nom || `Immeuble ${immeubleId.slice(0, 8)}`;
+    return immeuble?.nom || `Immeuble ${typeof immeubleId === "string" ? immeubleId.slice(0, 8) : ""}`;
   };
 
   const updatePermission = (immeubleId: string, path: string, value: boolean) => {
     setPermissions(prev => {
       const updated = { ...prev };
       const immeublePermissions = { ...updated[immeubleId] };
-      
-      // Gérer les permissions imbriquées (ex: comptabilite.read)
       if (path.includes('.')) {
         const [category, permission] = path.split('.');
         immeublePermissions[category as keyof ImmeublePermissions] = {
@@ -89,25 +83,50 @@ export function EditPermissionsModal({
           [permission]: value
         };
       } else {
-        // Permission simple (ex: delete_immeuble)
         (immeublePermissions as any)[path] = value;
       }
-      
       updated[immeubleId] = immeublePermissions;
       return updated;
     });
-    
+    setHasChanges(true);
+  };
+
+  // Ajout d'un immeuble assigné (admin uniquement)
+  const handleAddImmeuble = () => {
+    if (!selectedImmeuble) return;
+    if (immeublesAssignes.includes(selectedImmeuble)) return;
+    setImmeublesAssignes(prev => [...prev, selectedImmeuble]);
+    setPermissions(prev => ({
+      ...prev,
+      [selectedImmeuble]: {
+        gestion_immeuble: { read: true, write: true },
+        gestion_locataires: { read: true, write: true },
+        comptabilite: { read: false, write: false, export: false },
+        statistiques: { read: false, export: false },
+        delete_immeuble: false
+      }
+    }));
+    setSelectedImmeuble("");
+    setHasChanges(true);
+  };
+
+  // Suppression d'un immeuble assigné (admin uniquement)
+  const handleRemoveImmeuble = (immeubleId: string) => {
+    setImmeublesAssignes(prev => prev.filter(id => id !== immeubleId));
+    setPermissions(prev => {
+      const updated = { ...prev };
+      delete updated[immeubleId];
+      return updated;
+    });
     setHasChanges(true);
   };
 
   const handleSave = async () => {
     if (!gestionnaire || !user?.uid) return;
-
     setLoading(true);
     try {
       // Préparer les permissions pour la sauvegarde (exclure les permissions automatiques)
       const permissionsToSave: { [immeubleId: string]: any } = {};
-      
       Object.entries(permissions).forEach(([immeubleId, immeublePermissions]) => {
         permissionsToSave[immeubleId] = {
           comptabilite: immeublePermissions.comptabilite,
@@ -116,8 +135,10 @@ export function EditPermissionsModal({
         };
       });
 
-      const result = await UserManagementService.updateGestionnairePermissions(
+      // Mettre à jour la liste des immeubles assignés
+      const result = await UserManagementService.updateGestionnaireImmeublesEtPermissions(
         gestionnaire.id,
+        immeublesAssignes,
         permissionsToSave,
         user.uid
       );
@@ -145,6 +166,9 @@ export function EditPermissionsModal({
     );
   };
 
+  // Liste des immeubles non encore assignés
+  const immeublesNonAssignes = immeubles.filter(im => !immeublesAssignes.includes(im.id));
+
   if (!gestionnaire) return null;
 
   return (
@@ -156,7 +180,7 @@ export function EditPermissionsModal({
             <div>
               <span>Permissions de {gestionnaire.name}</span>
               <p className="text-sm font-normal text-gray-600 mt-1">
-                Configurez les permissions par immeuble - {gestionnaire.immeubles_assignes.length} immeuble(s) assigné(s)
+                Configurez les permissions par immeuble - {immeublesAssignes.length} immeuble(s) assigné(s)
               </p>
             </div>
           </DialogTitle>
@@ -179,9 +203,38 @@ export function EditPermissionsModal({
             </div>
           </div>
 
+          {/* Ajout d'un immeuble (admin uniquement) */}
+          {isAdmin() && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-2">
+              <div className="flex items-center gap-3">
+                <select
+                  value={selectedImmeuble}
+                  onChange={e => setSelectedImmeuble(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="">Sélectionner un immeuble à ajouter</option>
+                  {immeublesNonAssignes.map(im => (
+                    <option key={im.id} value={im.id}>
+                      {im.nom} ({typeof im.id === "string" ? im.id.slice(0, 8) : ""}...)
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  onClick={handleAddImmeuble}
+                  disabled={!selectedImmeuble}
+                  className="flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  Ajouter
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Configuration par immeuble */}
           <div className="space-y-4">
-            {gestionnaire.immeubles_assignes.map((immeubleId) => {
+            {immeublesAssignes.map((immeubleId) => {
               const immeublePermissions = permissions[immeubleId];
               if (!immeublePermissions) return null;
 
@@ -193,9 +246,23 @@ export function EditPermissionsModal({
                         <Building2 size={20} className="text-indigo-600" />
                         <span>{getImmeubleNom(immeubleId)}</span>
                       </CardTitle>
-                      <Badge variant="outline" className="text-xs">
-                        ID: {immeubleId.slice(0, 8)}...
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          ID: {typeof immeubleId === "string" ? immeubleId.slice(0, 8) : ""}...
+                        </Badge>
+                        {isAdmin() && (
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-700"
+                            title="Retirer cet immeuble"
+                            onClick={() => handleRemoveImmeuble(immeubleId)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
 

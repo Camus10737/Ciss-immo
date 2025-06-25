@@ -17,10 +17,11 @@ import {
 import { CreateGestionnaireModal } from "./CreateGestionnaireModal";
 import { GestionnairesList } from "./GestionnairesList";
 import { ActivityLogs } from "./ActivityLogs";
-import { PermissionsManager } from "./PermissionsManager";
+import PermissionsManager from "./PermissionsManager";
 import { InvitationsList } from "./InvitationsList";
 
 type AdminTab = "gestionnaires" | "invitations" | "permissions" | "logs";
+
 
 export function AdminSection() {
   const searchParams = useSearchParams();
