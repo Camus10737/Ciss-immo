@@ -18,7 +18,7 @@ interface DepenseManuelle {
   description?: string;
   montant: number;
   date: Date;
-  immeubleId?: string; // <-- Ajouté pour le filtrage
+  immeubleId?: string;
 }
 
 type DateRange = {
@@ -40,8 +40,11 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [openDatePopover, setOpenDatePopover] = useState(false);
 
-  // Permissions
-  const { canAccessComptabilite } = useAuthWithRole();
+  // Permissions et immeubles accessibles
+  const { isSuperAdmin, immeublesAssignes } = useAuthWithRole();
+  const immeublesAutorises = isSuperAdmin()
+    ? undefined
+    : (immeublesAssignes?.map(im => String(im.id)) || []);
 
   // Recharge les dépenses Firestore à chaque changement de refresh
   useEffect(() => {
@@ -77,23 +80,37 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
     fetchRecus();
   }, []);
 
-  // Vérification de la permission d'accès à la comptabilité de l'immeuble
-  if (immeubleId && !canAccessComptabilite(immeubleId)) {
-    return (
-      <div className="text-red-600 font-semibold p-4">
-        Vous n'avez pas la permission de voir la comptabilité de cet immeuble.
-      </div>
-    );
-  }
+  // Correction du filtrage pour super admin ET admin
+  const filteredRecus = recus.filter(recu => {
+    if (isSuperAdmin()) {
+      if (immeubleId) return String(recu.immeubleId) === String(immeubleId);
+      return true;
+    }
+    if (!recu.immeubleId) return false;
+    if (immeubleId) {
+      return (
+        String(recu.immeubleId) === String(immeubleId) &&
+        immeublesAutorises.includes(String(recu.immeubleId))
+      );
+    }
+    // SANS filtre immeuble, on veut TOUT ce qui est dans immeublesAutorises
+    return immeublesAutorises.includes(String(recu.immeubleId));
+  });
 
-  // Filtrage selon l'immeuble sélectionné
-  const filteredRecus = immeubleId
-    ? recus.filter(recu => recu.immeubleId === immeubleId)
-    : recus;
-
-  const filteredDepensesFirestore = immeubleId
-    ? depensesFirestore.filter(dep => dep.immeubleId === immeubleId)
-    : depensesFirestore;
+  const filteredDepensesFirestore = depensesFirestore.filter(dep => {
+    if (isSuperAdmin()) {
+      if (immeubleId) return String(dep.immeubleId) === String(immeubleId);
+      return true;
+    }
+    if (!dep.immeubleId) return false;
+    if (immeubleId) {
+      return (
+        String(dep.immeubleId) === String(immeubleId) &&
+        immeublesAutorises.includes(String(dep.immeubleId))
+      );
+    }
+    return immeublesAutorises.includes(String(dep.immeubleId));
+  });
 
   // Fusionne reçus validés et dépenses Firestore
   const operations = [
@@ -104,6 +121,7 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
       description: recu.description,
       date: recu.updatedAt ? new Date(recu.updatedAt) : new Date(),
       url: recu.fichierUrl,
+      immeubleId: recu.immeubleId,
     })),
     ...filteredDepensesFirestore.map(dep => ({
       type: "Dépense",
@@ -112,11 +130,14 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
       description: dep.description,
       date: dep.date,
       url: undefined,
+      immeubleId: dep.immeubleId,
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  // Liste unique des clients/comptes pour le filtre
-  const clientsList = Array.from(new Set(operations.map(op => op.client))).sort();
+  // Liste unique des clients/comptes pour le filtre (seulement ceux accessibles)
+  const clientsList = Array.from(new Set(
+    operations.map(op => op.client)
+  )).sort();
 
   // Filtres et recherche
   const filteredOperations = operations.filter(op => {

@@ -14,8 +14,7 @@ import {
   Trash2,
   UserPlus,
   RefreshCw,
-  MoreHorizontal,
-  MapPin
+  MoreHorizontal
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,6 +27,8 @@ import { UserManagementService } from "@/app/services/userManagementService";
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Gestionnaire } from "@/app/types/user-management";
 import { toast } from "sonner";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface GestionnairesListProps {
   onCreateClick: () => void;
@@ -35,21 +36,42 @@ interface GestionnairesListProps {
 }
 
 export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesListProps) {
-  const { user } = useAuthWithRole();
+  const { user, isSuperAdmin } = useAuthWithRole();
   const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
   const [loading, setLoading] = useState(true);
+  const [immeublesAll, setImmeublesAll] = useState<{ id: string; nom: string }[]>([]);
+  const [search, setSearch] = useState(""); // Barre de recherche
+
+  // Charger tous les immeubles pour faire la correspondance id -> nom
+  useEffect(() => {
+    const fetchImmeubles = async () => {
+      const snap = await getDocs(collection(db, "immeubles"));
+      setImmeublesAll(
+        snap.docs.map(doc => ({
+          id: doc.id,
+          nom: doc.data().nom || doc.id,
+        }))
+      );
+    };
+    fetchImmeubles();
+  }, []);
 
   // Charger les gestionnaires
   const loadGestionnaires = async () => {
     if (!user?.uid) return;
-    
     setLoading(true);
     try {
       const data = await UserManagementService.getGestionnaires();
-      setGestionnaires(data);
-      console.log('📋 Gestionnaires chargés:', data);
+      let filtered = data;
+      if (!isSuperAdmin()) {
+        // Admin : ne voit que les gestionnaires qui ont AU MOINS un immeuble assigné par lui
+        filtered = data.filter(g =>
+          Array.isArray(g.immeubles_assignes) &&
+          g.immeubles_assignes.some(im => im.assignedBy === user.uid)
+        );
+      }
+      setGestionnaires(filtered);
     } catch (error) {
-      console.error('Erreur chargement gestionnaires:', error);
       toast.error("Erreur lors du chargement des gestionnaires");
     } finally {
       setLoading(false);
@@ -59,6 +81,12 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
   useEffect(() => {
     loadGestionnaires();
   }, [user?.uid, refreshKey]);
+
+  // Recherche sur nom ou email
+  const gestionnairesFiltered = gestionnaires.filter(g =>
+    g.name?.toLowerCase().includes(search.toLowerCase()) ||
+    g.email?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleToggleStatus = async (gestionnaireId: string, currentStatus: string) => {
     if (!user?.uid) return;
@@ -79,21 +107,21 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
         toast.error(result.error || "Erreur lors du changement de statut");
       }
     } catch (error) {
-      console.error('Erreur changement statut:', error);
       toast.error("Une erreur inattendue s'est produite");
     }
   };
 
-  // NOUVELLE LOGIQUE : Retirer seulement les immeubles assignés par l'admin courant
+  // Correction : super admin retire tous les immeubles, admin retire seulement les siens
   const handleDelete = async (gestionnaire: Gestionnaire) => {
     if (!user?.uid) return;
 
-    // Ici, on suppose que tu as un moyen de savoir quels immeubles ont été assignés par l'admin courant.
-    // Si ce n'est pas le cas, il faut stocker cette info lors de l'assignation.
-    // Pour l'exemple, on retire tous les immeubles (à adapter selon ta logique réelle).
-    const immeublesARetirer = gestionnaire.immeubles_assignes;
+    const immeublesARetirer = isSuperAdmin()
+      ? (gestionnaire.immeubles_assignes || [])
+      : (gestionnaire.immeubles_assignes || []).filter(
+          (im) => im.assignedBy === user.uid
+        );
 
-    if (!immeublesARetirer || immeublesARetirer.length === 0) {
+    if (!immeublesARetirer.length) {
       toast.info("Aucun immeuble à retirer pour ce gestionnaire.");
       return;
     }
@@ -118,7 +146,6 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
         toast.error(result.error || "Erreur lors de la suppression");
       }
     } catch (error) {
-      console.error('Erreur suppression:', error);
       toast.error("Une erreur inattendue s'est produite");
     }
   };
@@ -145,67 +172,26 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
       .slice(0, 2);
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">Gestionnaires</h3>
-          <div className="flex space-x-2">
-            <Button size="sm" disabled>
-              <RefreshCw size={16} className="mr-2 animate-spin" />
-              Chargement...
-            </Button>
-          </div>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
-          <RefreshCw size={48} className="mx-auto text-gray-400 mb-4 animate-spin" />
-          <p className="text-gray-600">Chargement des gestionnaires...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (gestionnaires.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">Gestionnaires</h3>
-          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={onCreateClick}>
-            <UserPlus size={16} className="mr-2" />
-            Ajouter un gestionnaire
-          </Button>
-        </div>
-        
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
-          <Users size={48} className="mx-auto text-gray-400 mb-4" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">
-            Aucun gestionnaire
-          </h4>
-          <p className="text-gray-600 mb-4">
-            Commencez par ajouter des gestionnaires pour vos immeubles
-          </p>
-          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={onCreateClick}>
-            <UserPlus size={16} className="mr-2" />
-            Créer le premier gestionnaire
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* Header avec actions */}
-      <div className="flex justify-between items-center">
+      {/* Header avec actions et barre de recherche toujours visible */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
-            Gestionnaires ({gestionnaires.length})
+            Gestionnaires ({gestionnairesFiltered.length})
           </h3>
           <p className="text-sm text-gray-600">
             Gérez les gestionnaires et leurs accès aux immeubles
           </p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col md:flex-row gap-2 md:items-center">
+          <input
+            type="text"
+            placeholder="Rechercher par nom ou email..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full md:w-64 px-3 py-2 border rounded-md text-sm"
+          />
           <Button 
             size="sm" 
             variant="outline" 
@@ -222,103 +208,144 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
         </div>
       </div>
 
-      {/* Liste des gestionnaires */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {gestionnaires.map((gestionnaire) => (
-          <Card key={gestionnaire.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <Avatar>
-                    <AvatarFallback className="bg-indigo-100 text-indigo-600">
-                      {getInitials(gestionnaire.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <CardTitle className="text-lg">{gestionnaire.name}</CardTitle>
-                    <div className="flex items-center space-x-2 mt-1">
-                      {getStatusBadge(gestionnaire.status)}
-                    </div>
-                  </div>
-                </div>
-                
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal size={16} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => console.log('Modifier', gestionnaire.id)}>
-                      <Settings size={16} className="mr-2" />
-                      Modifier
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleToggleStatus(gestionnaire.id, gestionnaire.status)}
-                    >
-                      <Users size={16} className="mr-2" />
-                      {gestionnaire.status === 'active' ? 'Désactiver' : 'Activer'}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => handleDelete(gestionnaire)}
-                      className="text-red-600"
-                    >
-                      <Trash2 size={16} className="mr-2" />
-                      Retirer mes immeubles
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-3">
-              {/* Contact */}
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Mail size={14} />
-                  <span>{gestionnaire.email}</span>
-                </div>
-                {gestionnaire.phone && (
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Phone size={14} />
-                    <span>{gestionnaire.phone}</span>
-                  </div>
-                )}
-              </div>
+      {/* Loading */}
+      {loading && (
+        <div className="bg-gray-50 rounded-lg p-8 text-center">
+          <RefreshCw size={48} className="mx-auto text-gray-400 mb-4 animate-spin" />
+          <p className="text-gray-600">Chargement des gestionnaires...</p>
+        </div>
+      )}
 
-              {/* Immeubles assignés */}
-              <div>
-                <div className="flex items-center space-x-2 text-sm font-medium text-gray-900 mb-2">
-                  <Building2 size={14} />
-                  <span>Immeubles assignés ({gestionnaire.immeubles_assignes?.length || 0})</span>
-                </div>
-                {gestionnaire.immeubles_assignes && gestionnaire.immeubles_assignes.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {gestionnaire.immeubles_assignes.slice(0, 3).map((immeubleId, index) => (
-                      <Badge key={immeubleId} variant="outline" className="text-xs">
-                        Immeuble {index + 1}
-                      </Badge>
-                    ))}
-                    {gestionnaire.immeubles_assignes.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{gestionnaire.immeubles_assignes.length - 3}
-                      </Badge>
+      {/* Aucun gestionnaire trouvé */}
+      {!loading && gestionnairesFiltered.length === 0 && (
+        <div className="bg-gray-50 rounded-lg p-8 text-center">
+          <Users size={48} className="mx-auto text-gray-400 mb-4" />
+          <h4 className="text-lg font-medium text-gray-900 mb-2">
+            Aucun gestionnaire
+          </h4>
+          <p className="text-gray-600 mb-4">
+            {search
+              ? "Aucun gestionnaire ne correspond à votre recherche."
+              : "Commencez par ajouter des gestionnaires pour vos immeubles"}
+          </p>
+          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={onCreateClick}>
+            <UserPlus size={16} className="mr-2" />
+            Créer le premier gestionnaire
+          </Button>
+        </div>
+      )}
+
+      {/* Liste des gestionnaires */}
+      {!loading && gestionnairesFiltered.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {gestionnairesFiltered.map((gestionnaire) => {
+            const immeublesToShow = isSuperAdmin()
+              ? gestionnaire.immeubles_assignes || []
+              : (gestionnaire.immeubles_assignes || []).filter(
+                  (im) => im.assignedBy === user?.uid
+                );
+            return (
+              <Card key={gestionnaire.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Avatar>
+                        <AvatarFallback className="bg-indigo-100 text-indigo-600">
+                          {getInitials(gestionnaire.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-lg">{gestionnaire.name}</CardTitle>
+                        <div className="flex items-center space-x-2 mt-1">
+                          {getStatusBadge(gestionnaire.status)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal size={16} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => console.log('Modifier', gestionnaire.id)}>
+                          <Settings size={16} className="mr-2" />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleToggleStatus(gestionnaire.id, gestionnaire.status)}
+                        >
+                          <Users size={16} className="mr-2" />
+                          {gestionnaire.status === 'active' ? 'Désactiver' : 'Activer'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(gestionnaire)}
+                          className="text-red-600"
+                        >
+                          <Trash2 size={16} className="mr-2" />
+                          Retirer mes immeubles
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="space-y-3">
+                  {/* Contact */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <Mail size={14} />
+                      <span>{gestionnaire.email}</span>
+                    </div>
+                    {gestionnaire.phone && (
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Phone size={14} />
+                        <span>{gestionnaire.phone}</span>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <p className="text-xs text-gray-500">Aucun immeuble assigné</p>
-                )}
-              </div>
 
-              {/* Date de création */}
-              <div className="text-xs text-gray-500 pt-2 border-t">
-                Créé le {gestionnaire.createdAt.toLocaleDateString('fr-FR')}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  {/* Immeubles assignés */}
+                  <div>
+                    <div className="flex items-center space-x-2 text-sm font-medium text-gray-900 mb-2">
+                      <Building2 size={14} />
+                      <span>Immeubles assignés ({immeublesToShow.length})</span>
+                    </div>
+                    {immeublesToShow.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {immeublesToShow.slice(0, 3).map((im, index) => {
+                          const immeubleNom = immeublesAll.find(i => i.id === im.id)?.nom || im.id;
+                          return (
+                            <Badge key={im.id} variant="outline" className="text-xs">
+                              {immeubleNom}
+                            </Badge>
+                          );
+                        })}
+                        {immeublesToShow.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{immeublesToShow.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500">Aucun immeuble assigné</p>
+                    )}
+                  </div>
+
+                  {/* Date de création */}
+                  <div className="text-xs text-gray-500 pt-2 border-t">
+                    Créé le {gestionnaire.createdAt?.toLocaleDateString
+                      ? gestionnaire.createdAt.toLocaleDateString('fr-FR')
+                      : ""}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

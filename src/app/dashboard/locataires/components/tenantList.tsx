@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { UserPlus, Edit, Trash2, LogOut, Phone, Mail, Calendar, Search, Filter, Users } from "lucide-react"
-import { getLocataires, deleteLocataire, marquerSortieLocataire } from "@/app/services/locatairesService"
+import { getLocatairesByImmeubles, deleteLocataire, marquerSortieLocataire } from "@/app/services/locatairesService"
 import { useAuth } from "@/hooks/useAuth"
 import type { Locataire } from "@/app/types/locataires"
 import { immeublesService } from "@/app/services/immeublesService"
@@ -17,22 +17,37 @@ import { useAuthWithRole } from "@/hooks/useAuthWithRole"
 export default function TenantList() {
   const router = useRouter()
   const { user } = useAuth()
-  const { canAccessImmeuble, canWriteLocataires, isGestionnaire } = useAuthWithRole()
+  const { canAccessImmeuble, canWriteLocataires, isGestionnaire, isSuperAdmin, isAdmin } = useAuthWithRole()
 
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [filteredLocataires, setFilteredLocataires] = useState<Locataire[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statutFilter, setStatutFilter] = useState("tous")
+  const [immeubles, setImmeubles] = useState<any[]>([])
+  const [immeublesAutorises, setImmeublesAutorises] = useState<any[]>([])
   const [immeubleMap, setImmeubleMap] = useState<Record<string, string>>({}) // appartementId -> immeubleId
 
-  // Charger la correspondance appartementId -> immeubleId
+  // Charger tous les immeubles et filtrer ceux accessibles (logique ComptabiliteDetail)
   useEffect(() => {
     const chargerImmeubles = async () => {
       const result = await immeublesService.obtenirImmeubles()
       if (result.success && result.data) {
+        setImmeubles(result.data)
+        let autorises: any[] = []
+        if (isSuperAdmin()) {
+          autorises = result.data
+        } else if (isAdmin()) {
+          autorises = result.data.filter(im =>
+            user?.immeubles_assignes?.some((item: any) => item.id === im.id)
+          )
+        } else {
+          autorises = result.data.filter(im => canAccessImmeuble(im.id))
+        }
+        setImmeublesAutorises(autorises)
+        // Pour le mapping appartementId -> immeubleId
         const map: Record<string, string> = {}
-        for (const im of result.data) {
+        for (const im of autorises) {
           for (const apt of im.appartements) {
             map[apt.id] = im.id
           }
@@ -41,16 +56,33 @@ export default function TenantList() {
       }
     }
     chargerImmeubles()
-  }, [])
+  }, [isSuperAdmin, isAdmin, user, canAccessImmeuble])
 
-  // Charger les locataires
+  // Charger les locataires selon les immeubles accessibles (logique ComptabiliteDetail)
   useEffect(() => {
     const chargerLocataires = async () => {
-      if (!user) return
+      setLoading(true)
       try {
-        const locatairesData = await getLocataires(user.uid)
-        setLocataires(locatairesData)
-        setFilteredLocataires(locatairesData)
+        let idsImmeubles: string[] = []
+        if (isSuperAdmin()) {
+          idsImmeubles = immeubles.map((im) => im.id)
+        } else {
+          idsImmeubles = immeublesAutorises.map((im) => im.id)
+        }
+        if (!idsImmeubles.length) {
+          setLocataires([])
+          setFilteredLocataires([])
+          setLoading(false)
+          return
+        }
+        const locatairesData = await getLocatairesByImmeubles(idsImmeubles)
+        // Ajoute immeubleId à chaque locataire si besoin
+        const locatairesAvecImmeuble = locatairesData.map(l => ({
+          ...l,
+          immeubleId: l.immeubleId || immeubleMap[l.appartementId] || undefined,
+        }))
+        setLocataires(locatairesAvecImmeuble)
+        setFilteredLocataires(locatairesAvecImmeuble)
       } catch (error) {
         console.error("Erreur lors du chargement:", error)
       } finally {
@@ -58,28 +90,23 @@ export default function TenantList() {
       }
     }
     chargerLocataires()
-  }, [user])
+  }, [immeublesAutorises, immeubles, immeubleMap, isSuperAdmin])
 
   // Appliquer les filtres
   useEffect(() => {
     let filtered = [...locataires]
 
-    // 🔒 Filtrer selon les droits du gestionnaire (doit avoir write sur gestion_locataires)
-    if (isGestionnaire()) {
+    if (!isSuperAdmin()) {
+      const idsImmeublesAdmin = immeublesAutorises.map(im => String(im.id))
       filtered = filtered.filter(
-        (locataire) => {
-          const immeubleId = immeubleMap[locataire.appartementId]
-          return (
-            locataire.appartementId &&
-            immeubleId &&
-            canAccessImmeuble(immeubleId) &&
-            canWriteLocataires(immeubleId)
-          )
-        }
+        (locataire) =>
+          locataire.immeubleId &&
+          idsImmeublesAdmin.includes(String(locataire.immeubleId)) &&
+          canAccessImmeuble(locataire.immeubleId) &&
+          canWriteLocataires(locataire.immeubleId)
       )
     }
 
-    // Filtre par recherche
     if (searchTerm) {
       filtered = filtered.filter(
         (locataire) =>
@@ -89,7 +116,6 @@ export default function TenantList() {
       )
     }
 
-    // Filtre par statut
     if (statutFilter !== "tous") {
       filtered = filtered.filter((locataire) => {
         if (statutFilter === "actuel") return !locataire.dateSortie
@@ -99,7 +125,7 @@ export default function TenantList() {
     }
 
     setFilteredLocataires(filtered)
-  }, [locataires, searchTerm, statutFilter, immeubleMap, canAccessImmeuble, canWriteLocataires, isGestionnaire, user])
+  }, [locataires, searchTerm, statutFilter, canAccessImmeuble, canWriteLocataires, isSuperAdmin, immeublesAutorises])
 
   const handleDeleteLocataire = async (id: string, nom: string, prenom: string) => {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${prenom} ${nom} ?`)) {
@@ -118,8 +144,18 @@ export default function TenantList() {
       try {
         await marquerSortieLocataire(id)
         // Recharger les données
-        const locatairesData = await getLocataires(user!.uid)
-        setLocataires(locatairesData)
+        let idsImmeubles: string[] = []
+        if (isSuperAdmin()) {
+          idsImmeubles = immeubles.map((im) => im.id)
+        } else {
+          idsImmeubles = immeublesAutorises.map((im) => im.id)
+        }
+        const locatairesData = await getLocatairesByImmeubles(idsImmeubles)
+        const locatairesAvecImmeuble = locatairesData.map(l => ({
+          ...l,
+          immeubleId: l.immeubleId || immeubleMap[l.appartementId] || undefined,
+        }))
+        setLocataires(locatairesAvecImmeuble)
       } catch (error) {
         console.error("Erreur lors du marquage de sortie:", error)
         alert("Erreur lors du marquage de sortie")

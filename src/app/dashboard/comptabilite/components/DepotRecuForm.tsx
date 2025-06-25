@@ -35,11 +35,11 @@ export function DepotRecuForm({
 
   // Filtre les locataires selon l'immeuble sélectionné
   const filteredLocataires = selectedImmeuble
-    ? locataires.filter((l) => l.immeubleId === selectedImmeuble)
+    ? locataires.filter((l) => String(l.immeubleId) === String(selectedImmeuble))
     : [];
 
   const selectedLocataireObj = filteredLocataires.find(
-    (l) => l.id === selectedLocataire
+    (l) => String(l.id) === String(selectedLocataire)
   );
 
   const handleSubmit = async (e: React.FormEvent) => {

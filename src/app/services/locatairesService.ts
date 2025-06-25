@@ -78,7 +78,36 @@ export const createLocataire = async (
   }
 };
 
-// Récupérer tous les locataires d'un utilisateur
+// Récupérer tous les locataires d'une liste d'immeubles (NOUVELLE FONCTION)
+export const getLocatairesByImmeubles = async (immeubleIds: string[]): Promise<Locataire[]> => {
+  try {
+    if (!immeubleIds.length) return [];
+    // Firestore n'autorise que 10 éléments dans un "in", donc on découpe si besoin
+    const allLocataires: Locataire[] = [];
+    const chunkSize = 10;
+    for (let i = 0; i < immeubleIds.length; i += chunkSize) {
+      const chunk = immeubleIds.slice(i, i + chunkSize);
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('immeubleId', 'in', chunk),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      allLocataires.push(
+        ...querySnapshot.docs.map(doc => ({
+          ...convertFirestoreData(doc.data()),
+          id: doc.id,
+        }))
+      );
+    }
+    return allLocataires;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des locataires par immeubles:', error);
+    throw error;
+  }
+};
+
+// Récupérer tous les locataires d'un utilisateur (ANCIEN, À NE PLUS UTILISER POUR L'AFFICHAGE)
 export const getLocataires = async (userId: string): Promise<Locataire[]> => {
   try {
     const q = query(

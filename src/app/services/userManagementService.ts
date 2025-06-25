@@ -93,11 +93,11 @@ export class UserManagementService {
         const userDoc = snapshot.docs[0];
         const userData = userDoc.data();
         const currentImmeubles: ImmeubleAssignment[] = Array.isArray(userData.immeubles_assignes) ? userData.immeubles_assignes : [];
-        // Ajoute le(s) nouvel(s) immeuble(s) sans doublon (fusion par id)
+        // Ajoute le(s) nouvel(s) immeuble(s) sans doublon (fusion par id+assignedBy)
         const newImmeubles: ImmeubleAssignment[] = [
           ...currentImmeubles,
           ...formData.immeubles_assignes.filter(
-            (newItem) => !currentImmeubles.some((item) => item.id === newItem.id)
+            (newItem) => !currentImmeubles.some((item) => item.id === newItem.id && item.assignedBy === newItem.assignedBy)
           ),
         ];
 
@@ -292,10 +292,11 @@ export class UserManagementService {
   /**
    * Retire uniquement les immeubles spécifiés d'un gestionnaire
    * (et met à jour les permissions associées)
+   * Correction multi-admins : on retire sur id+assignedBy
    */
   static async retirerImmeublesAuGestionnaire(
     gestionnaireId: string,
-    immeublesARetirer: string[]
+    immeublesARetirer: { id: string; assignedBy: string }[]
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const gestionnaireRef = doc(db, "users", gestionnaireId);
@@ -305,9 +306,12 @@ export class UserManagementService {
       }
       const gestionnaire = gestionnaireSnap.data();
 
-      // 1. Retirer les immeubles (filtrer sur .id)
+      // 1. Retirer les immeubles (filtrer sur id ET assignedBy)
       const newImmeubles = (gestionnaire.immeubles_assignes || []).filter(
-        (item: any) => !immeublesARetirer.includes(item.id)
+        (item: any) =>
+          !immeublesARetirer.some(
+            (retirer) => retirer.id === item.id && retirer.assignedBy === item.assignedBy
+          )
       );
       // 2. Retirer les permissions associées
       const newPermissions: any = {};

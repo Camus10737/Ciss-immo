@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLocataires } from "@/hooks/useLocataires";
 import { immeublesService } from "@/app/services/immeublesService";
+import { getLocatairesByImmeubles } from "@/app/services/locatairesService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,14 +18,15 @@ import { DepensesList } from "./components/DepensesList";
 import { AjoutDepenseForm } from "./components/AjoutDepenseForm";
 import { RapportAnnuel } from "./components/RapportAnnuel";
 import { ListeRapportsFinanciers } from "./components/ListeRapportsFinanciers";
-import { useAuthWithRole } from "@/hooks/useAuthWithRole"; // Ajout
+import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 
 export function ComptabiliteDetail({}) {
   const [activeTab, setActiveTab] = useState("revenus");
-  const { locataires, loading } = useLocataires();
+  const [locataires, setLocataires] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [immeubles, setImmeubles] = useState<any[]>([]);
+  const [loadingImmeubles, setLoadingImmeubles] = useState(true);
   const [showDepenseForm, setShowDepenseForm] = useState(false);
-  const [depenses, setDepenses] = useState<any[]>([]);
   const [refreshDepenses, setRefreshDepenses] = useState(0);
   const [showRapport, setShowRapport] = useState(false);
   const [refreshRapports, setRefreshRapports] = useState(0);
@@ -36,24 +37,86 @@ export function ComptabiliteDetail({}) {
   // Pour filtrer les rapports par immeuble
   const [selectedImmeubleRapport, setSelectedImmeubleRapport] = useState<string>("");
 
+  // Permissions
+  const { canAccessImmeuble, isSuperAdmin, isAdmin, immeublesAssignes, user } = useAuthWithRole();
+
+  // On ne garde que les immeubles accessibles à l'utilisateur courant
+  const [immeublesAutorises, setImmeublesAutorises] = useState<any[]>([]);
+
+  // Chargement des immeubles (filtrage inspiré de BuildingList)
+  useEffect(() => {
+    setLoadingImmeubles(true);
+    immeublesService.obtenirImmeubles().then(res => {
+      const allImmeubles = res.success && res.data ? res.data : [];
+      let autorises: any[] = [];
+      if (isSuperAdmin()) {
+        autorises = allImmeubles;
+      } else if (isAdmin()) {
+        autorises = allImmeubles.filter(im =>
+          user?.immeubles_assignes?.some((item: any) => item.id === im.id)
+        );
+      } else {
+        autorises = allImmeubles.filter(im => canAccessImmeuble(im.id));
+      }
+      setImmeublesAutorises(autorises);
+      setImmeubles(allImmeubles);
+      setLoadingImmeubles(false);
+    });
+    // eslint-disable-next-line
+  }, [isSuperAdmin, isAdmin, user, immeublesAssignes]);
+
+  // Chargement des locataires selon les immeubles accessibles
+  useEffect(() => {
+    const fetchLocataires = async () => {
+      setLoading(true);
+      let idsImmeubles: string[] = [];
+      if (isSuperAdmin()) {
+        idsImmeubles = immeubles.map((im) => im.id);
+      } else {
+        idsImmeubles = immeublesAutorises.map((im) => im.id);
+      }
+      if (idsImmeubles.length === 0) {
+        setLocataires([]);
+        setLoading(false);
+        return;
+      }
+      const locs = await getLocatairesByImmeubles(idsImmeubles);
+      setLocataires(locs);
+      setLoading(false);
+    };
+    fetchLocataires();
+  }, [immeublesAutorises, immeubles, isSuperAdmin]);
+
   // Filtrer les locataires actuels (pas de dateSortie)
   const locatairesActuels = (locataires || []).filter((l) => !l.dateSortie);
 
-  // Récupérer les immeubles au chargement du composant
-  useEffect(() => {
-    immeublesService.obtenirImmeubles().then(res => {
-      setImmeubles(res.success && res.data ? res.data : []);
-    });
-  }, []);
+  // --- mapping locataires <-> immeubleId (sécurité si besoin) ---
+  const locatairesActuelsAvecImmeuble = locatairesActuels.map(l => {
+    if (l.immeubleId) return l;
+    const immeuble = immeublesAutorises.find(im =>
+      (im.appartements || []).some((apt: any) => apt.id === l.appartementId)
+    );
+    return {
+      ...l,
+      immeubleId: immeuble ? immeuble.id : undefined,
+    };
+  });
 
-  // Ajout d'une dépense (tu peux remplacer ce stockage local par un enregistrement en base)
-  const handleSaveDepense = (depense: any) => {
-    setDepenses((prev) => [...prev, depense]);
-  };
-
-  // Ajout pour filtrer les immeubles selon les droits du gestionnaire
-  const { canAccessImmeuble } = useAuthWithRole();
-  const immeublesAutorises = immeubles.filter(im => canAccessImmeuble(im.id));
+  // Si l'utilisateur n'a accès à aucun immeuble, on affiche un message
+  if (!loadingImmeubles && immeublesAutorises.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <Calculator size={48} className="mx-auto text-blue-300 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Aucun immeuble accessible</h2>
+          <p className="text-gray-600 mb-4">
+            Vous n'avez pas d'immeuble associé pour la comptabilité.<br />
+            Contactez un administrateur pour obtenir l'accès.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -152,7 +215,7 @@ export function ComptabiliteDetail({}) {
               {loading ? (
                 <div>Chargement des locataires...</div>
               ) : (
-                <DepotRecuForm locataires={locatairesActuels} immeubles={immeublesAutorises} />
+                <DepotRecuForm locataires={locatairesActuelsAvecImmeuble} immeubles={immeublesAutorises} />
               )}
             </CardContent>
           </Card>
@@ -169,6 +232,7 @@ export function ComptabiliteDetail({}) {
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 size="sm"
                 onClick={() => setShowDepenseForm(true)}
+                disabled={immeublesAutorises.length === 0}
               >
                 Ajouter une dépense
               </Button>
@@ -197,10 +261,10 @@ export function ComptabiliteDetail({}) {
                     setRefreshDepenses((r) => r + 1);
                   }}
                   onClose={() => setShowDepenseForm(false)}
-                  immeubleId={selectedImmeuble}
+                  immeubleId={selectedImmeuble || undefined}
                 />
               )}
-              <DepensesList refresh={refreshDepenses} immeubleId={selectedImmeuble} />
+              <DepensesList refresh={refreshDepenses} immeubleId={selectedImmeuble || undefined} />
             </CardContent>
           </Card>
         )}

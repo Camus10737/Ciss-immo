@@ -9,7 +9,11 @@ export function ListeRapportsFinanciers({ refresh, immeubles }: { refresh: numbe
   const [rapports, setRapports] = useState<any[]>([]);
   const [selectedRapport, setSelectedRapport] = useState<any | null>(null);
 
-  const { canDeleteImmeuble, canAccessImmeuble, isAdmin } = useAuthWithRole();
+  const { canDeleteImmeuble, isSuperAdmin, isAdmin } = useAuthWithRole();
+
+  const immeubleIdsAutorises = isSuperAdmin()
+    ? immeubles.map(im => im.id)
+    : immeubles.map(im => im.id);
 
   const refreshList = () => getRapportsAnnuels().then(setRapports);
 
@@ -27,8 +31,7 @@ export function ListeRapportsFinanciers({ refresh, immeubles }: { refresh: numbe
   // Filtrer les rapports selon la permission d'accès à l'immeuble
   const rapportsVisibles = rapports.filter(r =>
     !r.immeubleId ||
-    isAdmin() ||
-    canAccessImmeuble(r.immeubleId)
+    (isSuperAdmin() ? true : immeubleIdsAutorises.includes(r.immeubleId))
   );
 
   if (!rapportsVisibles.length) {

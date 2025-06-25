@@ -20,7 +20,9 @@ import { ActivityLogs } from "./ActivityLogs";
 import PermissionsManager from "./PermissionsManager";
 import { InvitationsList } from "./InvitationsList";
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
-import AjouterAdminForm from "./AjouterAdminForm"; // À créer si pas déjà fait
+import AjouterAdminForm from "./AjouterAdminForm";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type AdminTab = "gestionnaires" | "invitations" | "permissions" | "logs" | "ajouter-admin";
 
@@ -35,12 +37,40 @@ export function AdminSection() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // États pour les compteurs
+  const [nbGestionnaires, setNbGestionnaires] = useState(0);
+  const [nbInvitations, setNbInvitations] = useState(0);
+  const [nbImmeubles, setNbImmeubles] = useState(0);
+  const [nbActions, setNbActions] = useState(0);
+
   // Active automatiquement l'onglet invitations si un token est présent dans l'URL
   useEffect(() => {
     if (urlToken || urlTab === "invitations") {
       setActiveTab("invitations");
     }
   }, [urlToken, urlTab]);
+
+  // Récupération des compteurs Firestore
+  useEffect(() => {
+    const fetchCounts = async () => {
+      // Gestionnaires
+      const usersSnap = await getDocs(collection(db, "users"));
+      setNbGestionnaires(usersSnap.docs.filter(doc => doc.data().role === "GESTIONNAIRE").length);
+
+      // Invitations
+      const invitationsSnap = await getDocs(collection(db, "invitations"));
+      setNbInvitations(invitationsSnap.size);
+
+      // Immeubles
+      const immeublesSnap = await getDocs(collection(db, "immeubles"));
+      setNbImmeubles(immeublesSnap.size);
+
+      // Actions/logs (exemple: collection "logs")
+      const logsSnap = await getDocs(collection(db, "logs"));
+      setNbActions(logsSnap.size);
+    };
+    fetchCounts();
+  }, [refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
@@ -52,68 +82,70 @@ export function AdminSection() {
 
   return (
     <div className="space-y-6">
-      {/* Header avec stats rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Users size={20} className="text-white" />
+      {/* Header avec stats rapides - visible seulement pour le super admin */}
+      {isSuperAdmin() && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <Users size={20} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-blue-600 font-medium">
+                    Gestionnaires
+                  </p>
+                  <p className="text-2xl font-bold text-blue-900">{nbGestionnaires}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-blue-600 font-medium">
-                  Gestionnaires
-                </p>
-                <p className="text-2xl font-bold text-blue-900">0</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-orange-600 rounded-lg">
-                <Mail size={20} className="text-white" />
+          <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-orange-600 rounded-lg">
+                  <Mail size={20} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-orange-600 font-medium">
+                    Invitations
+                  </p>
+                  <p className="text-2xl font-bold text-orange-900">{nbInvitations}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-orange-600 font-medium">
-                  Invitations
-                </p>
-                <p className="text-2xl font-bold text-orange-900">0</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-600 rounded-lg">
-                <Shield size={20} className="text-white" />
+          <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-600 rounded-lg">
+                  <Shield size={20} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-green-600 font-medium">Immeubles</p>
+                  <p className="text-2xl font-bold text-green-900">{nbImmeubles}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-green-600 font-medium">Immeubles</p>
-                <p className="text-2xl font-bold text-green-900">0</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-600 rounded-lg">
-                <Activity size={20} className="text-white" />
+          <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-600 rounded-lg">
+                  <Activity size={20} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-purple-600 font-medium">Actions</p>
+                  <p className="text-2xl font-bold text-purple-900">{nbActions}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-purple-600 font-medium">Actions</p>
-                <p className="text-2xl font-bold text-purple-900">0</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Section principale avec onglets */}
       <Card className="bg-white border-0 shadow-sm">

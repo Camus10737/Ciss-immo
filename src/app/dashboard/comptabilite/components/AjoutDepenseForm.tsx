@@ -3,17 +3,18 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { depensesService } from "@/app/services/depensesService";
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
+import { immeublesService } from "@/app/services/immeublesService";
 
 const comptesDefaut = ["Autres"];
 
 export function AjoutDepenseForm({
   onSave,
   onClose,
-  immeubleId,
+  immeubleId: propImmeubleId,
 }: {
   onSave: () => void;
   onClose: () => void;
-  immeubleId: string;
+  immeubleId?: string;
 }) {
   const [comptes, setComptes] = useState<string[]>(comptesDefaut);
   const [client, setClient] = useState("");
@@ -21,7 +22,35 @@ export function AjoutDepenseForm({
   const [montant, setMontant] = useState("");
   const [showAddCompte, setShowAddCompte] = useState(false);
   const [nouveauCompte, setNouveauCompte] = useState("");
-  const { canWriteComptabilite } = useAuthWithRole();
+  const [immeubles, setImmeubles] = useState<any[]>([]);
+  const [selectedImmeuble, setSelectedImmeuble] = useState<string>(propImmeubleId || "");
+
+  const { canWriteComptabilite, isSuperAdmin, user } = useAuthWithRole();
+
+  // Charger la liste des immeubles accessibles (logique inspirée de buildingList)
+  useEffect(() => {
+    const fetchImmeubles = async () => {
+      const res = await immeublesService.obtenirImmeubles();
+      const allImmeubles = res.success && res.data ? res.data : [];
+      let autorises: any[] = [];
+      if (isSuperAdmin()) {
+        autorises = allImmeubles;
+      } else if (user?.immeubles_assignes && user.immeubles_assignes.length > 0) {
+        autorises = allImmeubles.filter(im =>
+          user.immeubles_assignes.some((item: any) => item.id === im.id)
+        );
+      } else {
+        autorises = allImmeubles.filter(im => canWriteComptabilite(im.id));
+      }
+      setImmeubles(autorises);
+      // Pré-sélectionne le premier immeuble si rien n'est sélectionné
+      if (!selectedImmeuble && autorises.length > 0) {
+        setSelectedImmeuble(autorises[0].id);
+      }
+    };
+    fetchImmeubles();
+    // eslint-disable-next-line
+  }, [isSuperAdmin, user]);
 
   // Charger la liste des comptes depuis le localStorage au montage
   useEffect(() => {
@@ -31,20 +60,25 @@ export function AjoutDepenseForm({
     }
   }, []);
 
+  // Vérifie que l'utilisateur a bien accès à l'immeuble sélectionné
+  const immeubleAutorise =
+    isSuperAdmin() ||
+    (immeubles.some((im) => String(im.id) === String(selectedImmeuble)));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canWriteComptabilite(immeubleId)) {
+    if (!immeubleAutorise || !canWriteComptabilite(selectedImmeuble)) {
       alert("Vous n'avez pas la permission d'ajouter une dépense sur cet immeuble.");
       return;
     }
     const compteFinal = showAddCompte ? nouveauCompte : client;
-    if (!compteFinal || !montant) return;
+    if (!compteFinal || !montant || !selectedImmeuble) return;
     await depensesService.ajouterDepense({
       client: compteFinal,
       description,
       montant: Number(montant),
       date: new Date(),
-      immeubleId,
+      immeubleId: selectedImmeuble,
     });
     if (showAddCompte && nouveauCompte && !comptes.includes(nouveauCompte)) {
       const newComptes = [...comptes, nouveauCompte];
@@ -61,7 +95,7 @@ export function AjoutDepenseForm({
   };
 
   // Si pas la permission, affiche un message et rien d'autre
-  if (!canWriteComptabilite(immeubleId)) {
+  if (immeubles.length === 0) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 max-w-md w-full relative text-center">
@@ -73,7 +107,7 @@ export function AjoutDepenseForm({
             ✕
           </button>
           <div className="mb-4 font-semibold text-lg text-red-600">
-            Vous n'avez pas la permission d'ajouter une dépense sur cet immeuble.
+            Aucun immeuble accessible pour enregistrer une dépense.
           </div>
         </div>
       </div>
@@ -92,6 +126,20 @@ export function AjoutDepenseForm({
         </button>
         <div className="mb-4 font-semibold text-lg">Ajouter une dépense</div>
         <div className="space-y-3">
+          <div>
+            <label className="block font-medium">Immeuble concerné</label>
+            <select
+              value={selectedImmeuble}
+              onChange={e => setSelectedImmeuble(e.target.value)}
+              className="border rounded px-2 py-1 w-full"
+              required
+            >
+              <option value="">Sélectionner un immeuble</option>
+              {immeubles.map((im) => (
+                <option key={im.id} value={im.id}>{im.nom}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block font-medium">Nom du compte de dépense</label>
             {!showAddCompte ? (

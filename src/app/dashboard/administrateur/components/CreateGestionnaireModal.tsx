@@ -30,7 +30,7 @@ import {
 
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Immeuble } from "@/app/types";
-import { immeublesService } from "@/app/services/immeublesService"; // Correction ici
+import { immeublesService } from "@/app/services/immeublesService";
 import {
   CreateGestionnaireFormData,
   ImmeubleAssignment,
@@ -97,13 +97,15 @@ export function CreateGestionnaireModal({
   // Correction : gestion des immeubles assignés avec {id, assignedBy}
   const handleImmeubleToggle = (immeubleId: string) => {
     setFormData((prev) => {
+      // Vérifie si cet immeuble est déjà assigné par cet admin
       const isAssigned = prev.immeubles_assignes.some(
-        (item) => item.id === immeubleId
+        (item) => item.id === immeubleId && item.assignedBy === user?.uid
       );
       let newAssignments: ImmeubleAssignment[];
       if (isAssigned) {
+        // Retirer seulement l'affectation faite par cet admin
         newAssignments = prev.immeubles_assignes.filter(
-          (item) => item.id !== immeubleId
+          (item) => !(item.id === immeubleId && item.assignedBy === user?.uid)
         );
       } else {
         newAssignments = [
@@ -112,7 +114,7 @@ export function CreateGestionnaireModal({
         ];
       }
 
-      // Initialiser ou supprimer les permissions pour cet immeuble
+      // Initialiser ou supprimer les permissions pour cet immeuble (pour cet admin)
       const newPermissions = { ...prev.permissions_supplementaires };
       if (!isAssigned && !newPermissions[immeubleId]) {
         newPermissions[immeubleId] = {
@@ -318,318 +320,320 @@ export function CreateGestionnaireModal({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {immeubles.map((immeuble) => (
-                    <Card
-                      key={immeuble.id}
-                      className="border-2 border-gray-100"
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start space-x-4">
-                          <Checkbox
-                            checked={formData.immeubles_assignes.some(
-                              (item) => item.id === immeuble.id
-                            )}
-                            onCheckedChange={() =>
-                              handleImmeubleToggle(immeuble.id)
-                            }
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <h4 className="font-semibold text-gray-900">
-                                  {immeuble.nom}
-                                </h4>
-                                <p className="text-sm text-gray-600">
-                                  {immeuble.quartier}, {immeuble.ville} •{" "}
-                                  {immeuble.nombreAppartements} appartements
-                                </p>
-                              </div>
-                              <Badge variant="outline">{immeuble.type}</Badge>
-                            </div>
-
-                            {/* Permissions pour cet immeuble */}
-                            {formData.immeubles_assignes.some(
-                              (item) => item.id === immeuble.id
-                            ) && (
-                              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                                <h5 className="font-medium text-gray-900 mb-3 flex items-center">
-                                  <Shield
-                                    size={16}
-                                    className="mr-2 text-indigo-600"
-                                  />
-                                  Permissions détaillées
-                                </h5>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {/* Gestion immeuble */}
-                                  <div>
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <Building2
-                                        size={16}
-                                        className="text-blue-600"
-                                      />
-                                      <span className="font-medium text-sm">
-                                        Gestion immeuble
-                                      </span>
-                                    </div>
-                                    <div className="space-y-2 ml-6">
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.gestion_immeuble?.read || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "gestion_immeuble",
-                                              "read",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">Voir</span>
-                                      </label>
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.gestion_immeuble?.write || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "gestion_immeuble",
-                                              "write",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">
-                                          Modifier
-                                        </span>
-                                      </label>
-                                    </div>
-                                  </div>
-                                  {/* Gestion locataires */}
-                                  <div>
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <User
-                                        size={16}
-                                        className="text-green-600"
-                                      />
-                                      <span className="font-medium text-sm">
-                                        Gestion locataires
-                                      </span>
-                                    </div>
-                                    <div className="space-y-2 ml-6">
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.gestion_locataires?.read || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "gestion_locataires",
-                                              "read",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">Voir</span>
-                                      </label>
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.gestion_locataires?.write ||
-                                            false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "gestion_locataires",
-                                              "write",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">
-                                          Modifier
-                                        </span>
-                                      </label>
-                                    </div>
-                                  </div>
-                                  {/* Comptabilité */}
-                                  <div>
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <Calculator
-                                        size={16}
-                                        className="text-green-600"
-                                      />
-                                      <span className="font-medium text-sm">
-                                        Comptabilité
-                                      </span>
-                                    </div>
-                                    <div className="space-y-2 ml-6">
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.comptabilite?.read || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "comptabilite",
-                                              "read",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">Voir</span>
-                                      </label>
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.comptabilite?.write || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "comptabilite",
-                                              "write",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">
-                                          Modifier
-                                        </span>
-                                      </label>
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.comptabilite?.export || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "comptabilite",
-                                              "export",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">
-                                          Exporter
-                                        </span>
-                                      </label>
-                                    </div>
-                                  </div>
-                                  {/* Statistiques */}
-                                  <div>
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <BarChart3
-                                        size={16}
-                                        className="text-blue-600"
-                                      />
-                                      <span className="font-medium text-sm">
-                                        Statistiques
-                                      </span>
-                                    </div>
-                                    <div className="space-y-2 ml-6">
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.statistiques?.read || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "statistiques",
-                                              "read",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">Voir</span>
-                                      </label>
-                                      <label className="flex items-center space-x-2">
-                                        <Checkbox
-                                          checked={
-                                            formData
-                                              .permissions_supplementaires[
-                                              immeuble.id
-                                            ]?.statistiques?.export || false
-                                          }
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(
-                                              immeuble.id,
-                                              "statistiques",
-                                              "export",
-                                              !!checked
-                                            )
-                                          }
-                                        />
-                                        <span className="text-sm">
-                                          Exporter
-                                        </span>
-                                      </label>
-                                    </div>
-                                  </div>
+                  {immeubles.map((immeuble) => {
+                    // Vérifie si cet immeuble est déjà assigné par cet admin
+                    const isChecked = formData.immeubles_assignes.some(
+                      (item) => item.id === immeuble.id && item.assignedBy === user?.uid
+                    );
+                    return (
+                      <Card
+                        key={immeuble.id}
+                        className="border-2 border-gray-100"
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start space-x-4">
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={() =>
+                                handleImmeubleToggle(immeuble.id)
+                              }
+                              className="mt-1"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <h4 className="font-semibold text-gray-900">
+                                    {immeuble.nom}
+                                  </h4>
+                                  <p className="text-sm text-gray-600">
+                                    {immeuble.quartier}, {immeuble.ville} •{" "}
+                                    {immeuble.nombreAppartements} appartements
+                                  </p>
                                 </div>
-                                {/* Permission spéciale : Supprimer immeuble */}
-                                <Separator className="my-3" />
-                                <label className="flex items-center space-x-2">
-                                  <Checkbox
-                                    checked={
-                                      formData.permissions_supplementaires[
-                                        immeuble.id
-                                      ]?.delete_immeuble || false
-                                    }
-                                    onCheckedChange={(checked) =>
-                                      handlePermissionChange(
-                                        immeuble.id,
-                                        "delete_immeuble",
-                                        "",
-                                        !!checked
-                                      )
-                                    }
-                                  />
-                                  <Trash2 size={16} className="text-red-600" />
-                                  <span className="text-sm font-medium text-red-600">
-                                    Autoriser la suppression de cet immeuble
-                                  </span>
-                                </label>
+                                <Badge variant="outline">{immeuble.type}</Badge>
                               </div>
-                            )}
+
+                              {/* Permissions pour cet immeuble */}
+                              {isChecked && (
+                                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                                  <h5 className="font-medium text-gray-900 mb-3 flex items-center">
+                                    <Shield
+                                      size={16}
+                                      className="mr-2 text-indigo-600"
+                                    />
+                                    Permissions détaillées
+                                  </h5>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Gestion immeuble */}
+                                    <div>
+                                      <div className="flex items-center space-x-2 mb-2">
+                                        <Building2
+                                          size={16}
+                                          className="text-blue-600"
+                                        />
+                                        <span className="font-medium text-sm">
+                                          Gestion immeuble
+                                        </span>
+                                      </div>
+                                      <div className="space-y-2 ml-6">
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.gestion_immeuble?.read || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "gestion_immeuble",
+                                                "read",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">Voir</span>
+                                        </label>
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.gestion_immeuble?.write || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "gestion_immeuble",
+                                                "write",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">
+                                            Modifier
+                                          </span>
+                                        </label>
+                                      </div>
+                                    </div>
+                                    {/* Gestion locataires */}
+                                    <div>
+                                      <div className="flex items-center space-x-2 mb-2">
+                                        <User
+                                          size={16}
+                                          className="text-green-600"
+                                        />
+                                        <span className="font-medium text-sm">
+                                          Gestion locataires
+                                        </span>
+                                      </div>
+                                      <div className="space-y-2 ml-6">
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.gestion_locataires?.read || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "gestion_locataires",
+                                                "read",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">Voir</span>
+                                        </label>
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.gestion_locataires?.write ||
+                                              false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "gestion_locataires",
+                                                "write",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">
+                                            Modifier
+                                          </span>
+                                        </label>
+                                      </div>
+                                    </div>
+                                    {/* Comptabilité */}
+                                    <div>
+                                      <div className="flex items-center space-x-2 mb-2">
+                                        <Calculator
+                                          size={16}
+                                          className="text-green-600"
+                                        />
+                                        <span className="font-medium text-sm">
+                                          Comptabilité
+                                        </span>
+                                      </div>
+                                      <div className="space-y-2 ml-6">
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.comptabilite?.read || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "comptabilite",
+                                                "read",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">Voir</span>
+                                        </label>
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.comptabilite?.write || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "comptabilite",
+                                                "write",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">
+                                            Modifier
+                                          </span>
+                                        </label>
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.comptabilite?.export || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "comptabilite",
+                                                "export",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">
+                                            Exporter
+                                          </span>
+                                        </label>
+                                      </div>
+                                    </div>
+                                    {/* Statistiques */}
+                                    <div>
+                                      <div className="flex items-center space-x-2 mb-2">
+                                        <BarChart3
+                                          size={16}
+                                          className="text-blue-600"
+                                        />
+                                        <span className="font-medium text-sm">
+                                          Statistiques
+                                        </span>
+                                      </div>
+                                      <div className="space-y-2 ml-6">
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.statistiques?.read || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "statistiques",
+                                                "read",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">Voir</span>
+                                        </label>
+                                        <label className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={
+                                              formData
+                                                .permissions_supplementaires[
+                                                immeuble.id
+                                              ]?.statistiques?.export || false
+                                            }
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(
+                                                immeuble.id,
+                                                "statistiques",
+                                                "export",
+                                                !!checked
+                                              )
+                                            }
+                                          />
+                                          <span className="text-sm">
+                                            Exporter
+                                          </span>
+                                        </label>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {/* Permission spéciale : Supprimer immeuble */}
+                                  <Separator className="my-3" />
+                                  <label className="flex items-center space-x-2">
+                                    <Checkbox
+                                      checked={
+                                        formData.permissions_supplementaires[
+                                          immeuble.id
+                                        ]?.delete_immeuble || false
+                                      }
+                                      onCheckedChange={(checked) =>
+                                        handlePermissionChange(
+                                          immeuble.id,
+                                          "delete_immeuble",
+                                          "",
+                                          !!checked
+                                        )
+                                      }
+                                    />
+                                    <Trash2 size={16} className="text-red-600" />
+                                    <span className="text-sm font-medium text-red-600">
+                                      Autoriser la suppression de cet immeuble
+                                    </span>
+                                  </label>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

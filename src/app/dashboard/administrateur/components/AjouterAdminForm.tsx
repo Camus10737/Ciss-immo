@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Users } from "lucide-react";
 
 export default function AjouterAdminForm() {
   const [email, setEmail] = useState("");
@@ -37,6 +38,12 @@ export default function AjouterAdminForm() {
   // Pour afficher/masquer le formulaire d'ajout
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // Pour la liste de tous les immeubles (id + nom)
+  const [immeublesAll, setImmeublesAll] = useState<{ id: string; nom: string }[]>([]);
+
+  // Barre de recherche
+  const [search, setSearch] = useState("");
+
   useEffect(() => {
     const fetchAdmins = async () => {
       const snap = await getDocs(collection(db, "users"));
@@ -47,6 +54,20 @@ export default function AjouterAdminForm() {
     };
     fetchAdmins();
   }, [refreshAdmins]);
+
+  // Récupère tous les immeubles pour afficher leur nom
+  useEffect(() => {
+    const fetchImmeubles = async () => {
+      const snap = await getDocs(collection(db, "immeubles"));
+      setImmeublesAll(
+        snap.docs.map(doc => ({
+          id: doc.id,
+          nom: doc.data().nom || doc.id,
+        }))
+      );
+    };
+    fetchImmeubles();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +132,12 @@ export default function AjouterAdminForm() {
       setLoading(false);
     }
   };
+
+  // Filtrage des admins selon la recherche (nom ou email)
+  const adminsFiltered = admins.filter(admin =>
+    admin.name?.toLowerCase().includes(search.toLowerCase()) ||
+    admin.email?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-8">
@@ -183,90 +210,114 @@ export default function AjouterAdminForm() {
 
       {/* Liste des admins */}
       <div className="bg-white rounded-xl shadow p-6 border border-blue-100">
-        <h3 className="text-lg font-semibold mb-4 text-blue-700 flex items-center gap-2">
-          <Shield className="text-blue-600" size={18} />
-          Liste des administrateurs
-        </h3>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-blue-700 flex items-center gap-2">
+            <Shield className="text-blue-600" size={18} />
+            Liste des administrateurs
+          </h3>
+          <input
+            type="text"
+            placeholder="Rechercher par nom ou email..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full md:w-64 px-3 py-2 border rounded-md text-sm"
+          />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {admins.map(admin => (
-            <Card key={admin.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Avatar>
-                      <AvatarFallback className="bg-blue-100 text-blue-600">
-                        {admin.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || "AD"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <CardTitle className="text-lg">{admin.name}</CardTitle>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge className="bg-blue-100 text-blue-800">Admin</Badge>
+          {adminsFiltered.length === 0 ? (
+            <div className="col-span-full text-center text-blue-500 py-8">
+              <Users size={48} className="mx-auto text-blue-200 mb-4" />
+              <div className="text-lg font-medium mb-2">Aucun administrateur</div>
+              <div>
+                {search
+                  ? "Aucun administrateur ne correspond à votre recherche."
+                  : "Ajoutez un administrateur pour commencer."}
+              </div>
+            </div>
+          ) : (
+            adminsFiltered.map(admin => (
+              <Card key={admin.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Avatar>
+                        <AvatarFallback className="bg-blue-100 text-blue-600">
+                          {admin.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || "AD"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-lg">{admin.name}</CardTitle>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Badge className="bg-blue-100 text-blue-800">Admin</Badge>
+                        </div>
                       </div>
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal size={16} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedAdmin(admin);
+                            setShowAssignModal(true);
+                          }}
+                        >
+                          <Building2 size={16} className="mr-2" />
+                          Assigner des immeubles
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {/* Ajoute ici d'autres actions si besoin */}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal size={16} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedAdmin(admin);
-                          setShowAssignModal(true);
-                        }}
-                      >
-                        <Building2 size={16} className="mr-2" />
-                        Assigner des immeubles
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {/* Ajoute ici d'autres actions si besoin */}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Contact */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2 text-sm text-blue-800">
-                    <Mail size={14} />
-                    <span>{admin.email}</span>
-                  </div>
-                  {admin.phone && (
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Contact */}
+                  <div className="space-y-2">
                     <div className="flex items-center space-x-2 text-sm text-blue-800">
-                      <Phone size={14} />
-                      <span>{admin.phone}</span>
+                      <Mail size={14} />
+                      <span>{admin.email}</span>
                     </div>
-                  )}
-                </div>
-                {/* Immeubles assignés */}
-                <div>
-                  <div className="flex items-center space-x-2 text-sm font-medium text-blue-900 mb-2">
-                    <Building2 size={14} />
-                    <span>Immeubles assignés ({admin.immeubles_assignes?.length || 0})</span>
+                    {admin.phone && (
+                      <div className="flex items-center space-x-2 text-sm text-blue-800">
+                        <Phone size={14} />
+                        <span>{admin.phone}</span>
+                      </div>
+                    )}
                   </div>
-                  {admin.immeubles_assignes && admin.immeubles_assignes.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {admin.immeubles_assignes.slice(0, 3).map((im: any, index: number) => (
-                        <Badge key={im.id} variant="outline" className="text-xs">
-                          {im.id}
-                        </Badge>
-                      ))}
-                      {admin.immeubles_assignes.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{admin.immeubles_assignes.length - 3}
-                        </Badge>
-                      )}
+                  {/* Immeubles assignés */}
+                  <div>
+                    <div className="flex items-center space-x-2 text-sm font-medium text-blue-900 mb-2">
+                      <Building2 size={14} />
+                      <span>Immeubles assignés ({admin.immeubles_assignes?.length || 0})</span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-blue-500">Aucun immeuble assigné</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    {admin.immeubles_assignes && admin.immeubles_assignes.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {admin.immeubles_assignes.slice(0, 3).map((im: any, index: number) => {
+                          const immeubleNom = immeublesAll.find(i => i.id === im.id)?.nom || im.id;
+                          return (
+                            <Badge key={im.id} variant="outline" className="text-xs">
+                              {immeubleNom}
+                            </Badge>
+                          );
+                        })}
+                        {admin.immeubles_assignes.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{admin.immeubles_assignes.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-blue-500">Aucun immeuble assigné</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
 
