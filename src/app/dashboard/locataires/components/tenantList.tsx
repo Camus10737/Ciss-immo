@@ -9,15 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { UserPlus, Edit, Trash2, LogOut, Phone, Mail, Calendar, Search, Filter, Users } from "lucide-react"
 import { getLocatairesByImmeubles, deleteLocataire, marquerSortieLocataire } from "@/app/services/locatairesService"
-import { useAuth } from "@/hooks/useAuth"
 import type { Locataire } from "@/app/types/locataires"
 import { immeublesService } from "@/app/services/immeublesService"
 import { useAuthWithRole } from "@/hooks/useAuthWithRole"
 
 export default function TenantList() {
   const router = useRouter()
-  const { user } = useAuth()
-  const { canAccessImmeuble, canWriteLocataires, isGestionnaire, isSuperAdmin, isAdmin } = useAuthWithRole()
+  const {
+    canAccessImmeuble,
+    canWriteLocataires,
+    isGestionnaire,
+    isSuperAdmin,
+    isAdmin,
+    immeublesAssignes,
+    loading: loadingAuth
+  } = useAuthWithRole()
 
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [filteredLocataires, setFilteredLocataires] = useState<Locataire[]>([])
@@ -28,8 +34,13 @@ export default function TenantList() {
   const [immeublesAutorises, setImmeublesAutorises] = useState<any[]>([])
   const [immeubleMap, setImmeubleMap] = useState<Record<string, string>>({}) // appartementId -> immeubleId
 
-  // Charger tous les immeubles et filtrer ceux accessibles (logique ComptabiliteDetail)
+  // Attendre que les droits soient prêts
+  const droitsPrets =
+    !loadingAuth && (isSuperAdmin() || Array.isArray(immeublesAssignes));
+
+  // Charger tous les immeubles et filtrer ceux accessibles
   useEffect(() => {
+    if (!droitsPrets) return;
     const chargerImmeubles = async () => {
       const result = await immeublesService.obtenirImmeubles()
       if (result.success && result.data) {
@@ -39,7 +50,7 @@ export default function TenantList() {
           autorises = result.data
         } else if (isAdmin()) {
           autorises = result.data.filter(im =>
-            user?.immeubles_assignes?.some((item: any) => item.id === im.id)
+            immeublesAssignes.some((item: any) => item.id === im.id)
           )
         } else {
           autorises = result.data.filter(im => canAccessImmeuble(im.id))
@@ -56,10 +67,11 @@ export default function TenantList() {
       }
     }
     chargerImmeubles()
-  }, [isSuperAdmin, isAdmin, user, canAccessImmeuble])
+  }, [isSuperAdmin, isAdmin, immeublesAssignes, canAccessImmeuble, droitsPrets])
 
-  // Charger les locataires selon les immeubles accessibles (logique ComptabiliteDetail)
+  // Charger les locataires selon les immeubles accessibles
   useEffect(() => {
+    if (!droitsPrets) return;
     const chargerLocataires = async () => {
       setLoading(true)
       try {
@@ -84,13 +96,14 @@ export default function TenantList() {
         setLocataires(locatairesAvecImmeuble)
         setFilteredLocataires(locatairesAvecImmeuble)
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error("Erreur lors du chargement:", error)
       } finally {
         setLoading(false)
       }
     }
     chargerLocataires()
-  }, [immeublesAutorises, immeubles, immeubleMap, isSuperAdmin])
+  }, [immeublesAutorises, immeubles, immeubleMap, isSuperAdmin, droitsPrets])
 
   // Appliquer les filtres
   useEffect(() => {
@@ -133,6 +146,7 @@ export default function TenantList() {
         await deleteLocataire(id)
         setLocataires((prev) => prev.filter((loc) => loc.id !== id))
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error("Erreur lors de la suppression:", error)
         alert("Erreur lors de la suppression")
       }
@@ -157,6 +171,7 @@ export default function TenantList() {
         }))
         setLocataires(locatairesAvecImmeuble)
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error("Erreur lors du marquage de sortie:", error)
         alert("Erreur lors du marquage de sortie")
       }
@@ -169,6 +184,14 @@ export default function TenantList() {
 
   const locatairesActuels = filteredLocataires.filter((l) => !l.dateSortie).length
   const ancienLocataires = filteredLocataires.filter((l) => l.dateSortie).length
+
+  if (!droitsPrets) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-blue-700 font-medium">Chargement des droits...</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

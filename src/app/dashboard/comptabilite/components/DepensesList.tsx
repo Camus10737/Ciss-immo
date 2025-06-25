@@ -41,21 +41,24 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
   const [openDatePopover, setOpenDatePopover] = useState(false);
 
   // Permissions et immeubles accessibles
-  const { isSuperAdmin, immeublesAssignes } = useAuthWithRole();
+  const { isSuperAdmin, immeublesAssignes, loading: loadingAuth } = useAuthWithRole();
   const immeublesAutorises = isSuperAdmin()
     ? undefined
     : (immeublesAssignes?.map(im => String(im.id)) || []);
 
-  // Recharge les dépenses Firestore à chaque changement de refresh
+  // Recharge les dépenses Firestore à chaque changement de refresh ou immeublesAutorises
   useEffect(() => {
+    if (loadingAuth) return;
     const fetchDepenses = async () => {
       const depenses = await depensesService.getDepenses();
       setDepensesFirestore(depenses);
     };
     fetchDepenses();
-  }, [refresh]);
+  }, [refresh, loadingAuth, JSON.stringify(immeublesAutorises)]);
 
+  // Recharge les reçus à chaque changement de refresh ou immeublesAutorises
   useEffect(() => {
+    if (loadingAuth) return;
     const fetchRecus = async () => {
       setLoading(true);
       const allRecus = await recuService.getRecusValides();
@@ -78,7 +81,7 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
       setLoading(false);
     };
     fetchRecus();
-  }, []);
+  }, [refresh, loadingAuth, JSON.stringify(immeublesAutorises)]);
 
   // Correction du filtrage pour super admin ET admin
   const filteredRecus = recus.filter(recu => {
@@ -228,6 +231,10 @@ export function DepensesList({ refresh = 0, immeubleId }: { refresh?: number; im
         </PopoverContent>
       </Popover>
     );
+  }
+
+  if (loadingAuth) {
+    return <div>Chargement des droits...</div>;
   }
 
   return (

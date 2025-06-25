@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { recuService } from "@/app/services/recusService";
 import { depensesService } from "@/app/services/depensesService";
 import { getLocataireById } from "@/app/services/locatairesService";
+import { immeublesService } from "@/app/services/immeublesService";
 import { Button } from "@/components/ui/button";
 import { RecuPaiement } from "@/app/types/recus";
 import { Eye, CheckCircle2, XCircle } from "lucide-react";
@@ -85,7 +86,34 @@ export function ValidationRecusAdmin() {
     { year: number; month: number }[]
   >([]);
 
+  // Ajout pour immeubles et appartements
+  const [immeubles, setImmeubles] = useState<any[]>([]);
+  const [appartementsMap, setAppartementsMap] = useState<Record<string, { nom: string; immeubleId: string }>>({});
+  const [immeublesMap, setImmeublesMap] = useState<Record<string, string>>({});
+
   const { canWriteComptabilite } = useAuthWithRole();
+
+  // Récupérer immeubles et appartements pour affichage
+  useEffect(() => {
+    const fetchImmeubles = async () => {
+      const result = await immeublesService.obtenirImmeubles();
+      if (result.success && result.data) {
+        setImmeubles(result.data);
+        const appartMap: Record<string, { nom: string; immeubleId: string }> = {};
+        const imMap: Record<string, string> = {};
+        for (const im of result.data) {
+          imMap[im.id] = im.nom;
+          for (const apt of im.appartements) {
+            // Affiche "Apt 1", "Apt 2", etc. si pas de nom
+            appartMap[apt.id] = { nom: apt.nom || `Apt ${apt.numero || ""}`, immeubleId: im.id };
+          }
+        }
+        setAppartementsMap(appartMap);
+        setImmeublesMap(imMap);
+      }
+    };
+    fetchImmeubles();
+  }, []);
 
   const fetchRecus = async () => {
     setLoading(true);
@@ -267,46 +295,51 @@ export function ValidationRecusAdmin() {
       {loading && <div>Chargement...</div>}
       {recusVisibles.length === 0 && !loading && <div>Aucun reçu en attente.</div>}
       <ul className="space-y-4">
-        {recusVisibles.map((recu) => (
-          <li key={recu.id} className="border rounded p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <b>Soumis par :</b>{" "}
-                {locataireNames[recu.locataireId] || recu.locataireId} <br />
-                <b>Appartement :</b> {recu.appartementId} <br />
-                <b>Mois payés :</b> {recu.moisPayes}
+        {recusVisibles.map((recu) => {
+          const appart = appartementsMap[recu.appartementId];
+          const nomAppart = appart?.nom || `Apt`;
+          const nomImmeuble = appart?.immeubleId ? immeublesMap[appart.immeubleId] : "";
+          return (
+            <li key={recu.id} className="border rounded p-4 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <b>Soumis par :</b>{" "}
+                  {locataireNames[recu.locataireId] || recu.locataireId} <br />
+                  <b>Immeuble :</b> {nomImmeuble || "-"} <br />
+                  <b>Appartement :</b> {nomAppart} <br />
+                  <b>Mois payés :</b> {recu.moisPayes}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() => setModalUrl(recu.fichierUrl)}
+                    title="Voir le reçu"
+                  >
+                    <Eye size={16} className="mr-1" />
+                    Voir
+                  </Button>
+                  <Button
+                    onClick={() => openValidationModal(recu)}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    title="Valider"
+                  >
+                    <CheckCircle2 size={16} className="mr-1" />
+                    Valider
+                  </Button>
+                  <Button
+                    onClick={() => handleRefus(recu.id)}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    title="Refuser"
+                  >
+                    <XCircle size={16} className="mr-1" />
+                    Refuser
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={() => setModalUrl(recu.fichierUrl)}
-                  title="Voir le reçu"
-                >
-                  <Eye size={16} className="mr-1" />
-                  Voir
-                </Button>
-                {/* Contrôle de permission ici */}
-                <Button
-                  onClick={() => openValidationModal(recu)}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  title="Valider"
-                >
-                  <CheckCircle2 size={16} className="mr-1" />
-                  Valider
-                </Button>
-                <Button
-                  onClick={() => handleRefus(recu.id)}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                  title="Refuser"
-                >
-                  <XCircle size={16} className="mr-1" />
-                  Refuser
-                </Button>
-              </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       {/* Fenêtre contextuelle (modal) pour afficher le reçu */}

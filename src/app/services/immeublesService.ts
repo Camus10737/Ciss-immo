@@ -169,6 +169,9 @@ export const immeublesService = {
       );
 
       // Appliquer les filtres
+      if (filters?.pays) {
+        q = query(q, where("pays", "==", filters.pays));
+      }
       if (filters?.ville) {
         q = query(q, where("ville", "==", filters.ville));
       }
@@ -273,7 +276,30 @@ export const immeublesService = {
     } catch (error: any) {
       return { success: false, error: error.message };
     }
-  }, // ✅ Virgule ici
+  },
+
+  // Obtenir les pays uniques pour les filtres
+  async obtenirPays(): Promise<{
+    success: boolean;
+    data?: string[];
+    error?: string;
+  }> {
+    try {
+      const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+      const paysSet = new Set<string>();
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.pays) {
+          paysSet.add(data.pays);
+        }
+      });
+
+      return { success: true, data: Array.from(paysSet).sort() };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  },
 
   // Obtenir tous les appartements disponibles (libres)
   async obtenirAppartementsDisponibles(): Promise<{

@@ -8,6 +8,7 @@ export default function InvitationPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,14 +16,17 @@ export default function InvitationPage() {
       setMessage("Les mots de passe ne correspondent pas.");
       return;
     }
+    setLoading(true);
     const res = await fetch("/api/accept-invitation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, password }),
     });
     const data = await res.json();
+    setLoading(false);
     if (data.success) {
-      setMessage("Mot de passe défini, compte activé ! Vous pouvez maintenant vous connecter.");
+      // Redirige automatiquement vers la page de login
+      window.location.href = "/login";
     } else {
       setMessage(data.error || "Erreur lors de la validation.");
     }
@@ -55,10 +59,11 @@ export default function InvitationPage() {
         <button
           type="submit"
           className="bg-indigo-600 text-white px-4 py-2 rounded w-full"
+          disabled={loading}
         >
-          Définir le mot de passe
+          {loading ? "Traitement..." : "Définir le mot de passe"}
         </button>
-        {message && <div className="text-sm mt-2">{message}</div>}
+        {message && <div className="text-sm mt-2 text-red-600">{message}</div>}
       </form>
     </div>
   );

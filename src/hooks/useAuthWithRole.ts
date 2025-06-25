@@ -131,7 +131,7 @@ export function useAuthWithRole() {
 
   // Helpers pour les rôles
   const isSuperAdmin = useCallback(() => user?.role === 'SUPER_ADMIN', [user]);
-  const isAdmin = useCallback(() => user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN', [user]);
+  const isAdmin = useCallback(() => user?.role === 'ADMIN', [user]);
   const isGestionnaire = useCallback(() => user?.role === 'GESTIONNAIRE', [user]);
   const isLocataire = useCallback(() => user?.role === 'LOCATAIRE', [user]);
   const hasRole = useCallback((role: UserRole) => user?.role === role, [user]);
@@ -140,48 +140,74 @@ export function useAuthWithRole() {
   // Seul le super admin peut ajouter un immeuble
   const canAddImmeuble = useCallback(() => user?.role === 'SUPER_ADMIN', [user]);
 
-  // L'admin (et super admin) a tous les autres droits
+  // Un admin ou super admin n'a accès qu'à ses immeubles assignés
   const canAccessImmeuble = useCallback((immeubleId: string) => {
-    if (isAdmin()) return true;
+    if (isSuperAdmin()) return true;
+    if (isAdmin()) {
+      return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
+    }
     return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
-  }, [user, isAdmin]);
+  }, [user, isSuperAdmin, isAdmin]);
 
-  const canAccessComptabilite = useCallback((immeubleId: string) =>
-    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.read, [user, isAdmin]);
+  const canAccessComptabilite = useCallback((immeubleId: string) => {
+    if (isSuperAdmin()) return true;
+    if (isAdmin()) {
+      return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
+    }
+    return !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.read;
+  }, [user, isSuperAdmin, isAdmin]);
 
-  const canWriteComptabilite = useCallback((immeubleId: string) =>
-    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.write, [user, isAdmin]);
+  const canWriteComptabilite = useCallback((immeubleId: string) => {
+    if (isSuperAdmin()) return true;
+    if (isAdmin()) {
+      return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
+    }
+    return !!user?.permissions_supplementaires?.[immeubleId]?.comptabilite?.write;
+  }, [user, isSuperAdmin, isAdmin]);
 
-  const canAccessStatistiques = useCallback((immeubleId: string) =>
-    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.statistiques?.read, [user, isAdmin]);
+  const canAccessStatistiques = useCallback((immeubleId: string) => {
+    if (isSuperAdmin()) return true;
+    if (isAdmin()) {
+      return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
+    }
+    return !!user?.permissions_supplementaires?.[immeubleId]?.statistiques?.read;
+  }, [user, isSuperAdmin, isAdmin]);
 
-  const canDeleteImmeuble = useCallback((immeubleId: string) =>
-    isAdmin() || !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble, [user, isAdmin]);
+  const canDeleteImmeuble = useCallback((immeubleId: string) => {
+    if (isSuperAdmin()) return true;
+    if (isAdmin()) {
+      return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
+    }
+    return !!user?.permissions_supplementaires?.[immeubleId]?.delete_immeuble;
+  }, [user, isSuperAdmin, isAdmin]);
 
   const canWriteLocataires = useCallback((immeubleId: string) => {
-    if (isAdmin()) return true;
+    if (isSuperAdmin()) return true;
+    if (isAdmin()) {
+      return !!user?.immeubles_assignes?.some((item: any) => item.id === immeubleId);
+    }
     return !!user?.permissions_supplementaires?.[immeubleId]?.gestion_locataires?.write;
-  }, [user, isAdmin]);
+  }, [user, isSuperAdmin, isAdmin]);
 
   return {
-    user,
-    loading,
-    login,
-    register,
-    logout,
-    refreshUserData,
-    isSuperAdmin,
-    isAdmin,
-    isGestionnaire,
-    isLocataire,
-    hasRole,
-    // Helpers permissions
-    canAddImmeuble, // <--- à utiliser UNIQUEMENT pour afficher le bouton d'ajout d'immeuble
-    canAccessImmeuble,
-    canAccessComptabilite,
-    canWriteComptabilite,
-    canAccessStatistiques,
-    canDeleteImmeuble,
-    canWriteLocataires
-  };
+  user,
+  loading,
+  login,
+  register,
+  logout,
+  refreshUserData,
+  isSuperAdmin,
+  isAdmin,
+  isGestionnaire,
+  isLocataire,
+  hasRole,
+  canAddImmeuble,
+  canAccessImmeuble,
+  canAccessComptabilite,
+  canWriteComptabilite,
+  canAccessStatistiques,
+  canDeleteImmeuble,
+  canWriteLocataires,
+  immeublesAssignes: user?.immeubles_assignes || []
+};
 }

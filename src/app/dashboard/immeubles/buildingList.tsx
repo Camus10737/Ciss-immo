@@ -20,7 +20,8 @@ export function BuildingList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<FilterOptions>({});
   const [villes, setVilles] = useState<string[]>([]);
-  
+  const [pays, setPays] = useState<string[]>([]);
+
   // États pour les modales
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -34,6 +35,7 @@ export function BuildingList() {
   useEffect(() => {
     chargerImmeubles();
     chargerVilles();
+    chargerPays();
     // eslint-disable-next-line
   }, [filters]);
 
@@ -53,6 +55,14 @@ export function BuildingList() {
     const result = await immeublesService.obtenirVilles();
     if (result.success && result.data) {
       setVilles(result.data);
+    }
+  };
+
+  // Ajout pour charger la liste des pays
+  const chargerPays = async () => {
+    const result = await immeublesService.obtenirPays?.();
+    if (result && result.success && result.data) {
+      setPays(result.data);
     }
   };
 
@@ -188,7 +198,7 @@ export function BuildingList() {
       {/* Filtres et recherche */}
       <Card className="bg-white border-0 shadow-sm">
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {/* Recherche */}
             <div className="relative">
               <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -199,6 +209,21 @@ export function BuildingList() {
                 className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
+
+            {/* Filtre par pays */}
+            <Select value={filters.pays || 'all'} onValueChange={(value) =>
+              setFilters(prev => ({ ...prev, pays: value === 'all' ? undefined : value }))
+            }>
+              <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                <SelectValue placeholder="Tous les pays" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les pays</SelectItem>
+                {pays.map(paysItem => (
+                  <SelectItem key={paysItem} value={paysItem}>{paysItem}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Filtre par ville */}
             <Select value={filters.ville || 'all'} onValueChange={(value) => 
