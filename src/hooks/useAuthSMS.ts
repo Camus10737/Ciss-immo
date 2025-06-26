@@ -45,14 +45,15 @@ export const useAuthSMS = () => {
     isTestMode: false,
   });
 
-  // Flag pour éviter les chargements multiples
+  // 🔑 NOUVEAU: Flag pour éviter les chargements multiples
   const [isInitialized, setIsInitialized] = useState(false);
   
-  //  Référence stable pour éviter double initialisation
+  // 🔑 CORRECTION: Référence stable pour éviter double initialisation
   const hasInitializedRef = useRef(false);
 
-  //  Charger depuis localStorage une seule fois au démarrage
+  // 🔑 CORRECTION: Charger depuis localStorage une seule fois au démarrage
   useEffect(() => {
+    // ✅ Si déjà initialisé, ne pas recommencer
     if (hasInitializedRef.current) {
       console.log('⚠️ Initialisation déjà effectuée, ignorée');
       return;
@@ -61,7 +62,7 @@ export const useAuthSMS = () => {
     const initializeFromStorage = () => {
       try {
         console.log('🔄 Initialisation depuis localStorage...');
-        hasInitializedRef.current = true; 
+        hasInitializedRef.current = true; // ✅ Marquer comme initialisé immédiatement
         
         const savedLocataire = localStorage.getItem('auth_locataire');
         const savedLocataireUser = localStorage.getItem('auth_locataireUser');
@@ -98,11 +99,11 @@ export const useAuthSMS = () => {
     };
 
     initializeFromStorage();
-  }, []);
+  }, []); // ✅ Aucune dépendance = exécuté une seule fois
 
-  //  Sauvegarder dans localStorage (sans dépendance problématique)
+  // 🔑 CORRECTION: Sauvegarder dans localStorage (sans dépendance problématique)
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized) return; // Attendre l'initialisation
 
     if (state.locataire && state.isCodeVerified) {
       localStorage.setItem('auth_locataire', JSON.stringify(state.locataire));
@@ -123,7 +124,7 @@ export const useAuthSMS = () => {
     }
   }, [state.locataire, state.locataireUser, state.isCodeVerified, state.isTestMode, isInitialized]);
 
-  //  Firebase Auth State avec protection contre réinitialisation
+  // 🔑 CORRECTION: Firebase Auth State avec protection contre réinitialisation
   useEffect(() => {
     if (!isInitialized) {
       console.log('⏳ Firebase Auth: En attente d\'initialisation...');
@@ -132,7 +133,7 @@ export const useAuthSMS = () => {
 
     console.log('🔥 Configuration Firebase Auth listener...');
     
-    let isListenerActive = true; 
+    let isListenerActive = true; // ✅ Flag pour éviter les actions après nettoyage
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!isListenerActive) {
@@ -153,10 +154,10 @@ export const useAuthSMS = () => {
 
     return () => {
       console.log('🔥 Nettoyage Firebase Auth listener');
-      isListenerActive = false; 
+      isListenerActive = false; // ✅ Marquer comme inactif
       unsubscribe();
     };
-  }, [isInitialized]); 
+  }, [isInitialized]); // ✅ Seule dépendance : isInitialized
 
   // Formater automatiquement les numéros
   const formatPhoneNumber = (phone: string): string => {
@@ -207,7 +208,7 @@ export const useAuthSMS = () => {
     };
   }, [state.recaptchaVerifier]);
 
-  // Charger les données du locataire (fonction stable)
+  // 🔑 CORRECTION: Charger les données du locataire (fonction stable)
   const chargerDonneesLocataire = useCallback(async (phoneNumber: string) => {
     try {
       console.log('📊 Chargement données locataire pour:', phoneNumber);
@@ -242,7 +243,7 @@ export const useAuthSMS = () => {
         isLoading: false 
       }));
     }
-  }, []); 
+  }, []); // ✅ Pas de dépendances = fonction stable
 
   // Récupérer les données LocataireUser depuis Firestore
   const getLocataireUserByLocataireId = async (locataireId: string): Promise<LocataireUser | null> => {
@@ -588,7 +589,7 @@ export const useAuthSMS = () => {
     isPhoneNumberSent: state.isPhoneNumberSent,
     isCodeVerified: state.isCodeVerified,
     isTestMode: state.isTestMode,
-    isInitialized, 
+    isInitialized, // ✅ Nouveau: pour savoir si l'initialisation est terminée
     
     // Données utilisateur
     locataire: state.locataire,

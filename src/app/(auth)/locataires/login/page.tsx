@@ -1,566 +1,434 @@
-// src/app/dashboard/locataires/page.tsx
+// src/app/(auth)/locataires/login/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Upload, 
-  FileText, 
-  LogOut, 
-  Building,
-  Home,
-  User,
-  Calendar,
-  CheckCircle,
-  Loader2
-} from 'lucide-react';
+import { Loader2, Phone, MessageSquare, ArrowLeft, CheckCircle, TestTube } from 'lucide-react';
 import { useAuthSMS } from '@/hooks/useAuthSMS';
-import { recuService } from '@/app/services/recusService';
-import { Immeuble } from '@/app/types';
-import { immeublesService } from '@/app/services/immeublesService';
-import { auth } from '@/lib/firebase'; // ✅ Ajout import
 
-const LocataireDashboard = () => {
+const LocataireLoginPage = () => {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [step, setStep] = useState<'phone' | 'code' | 'success'>('phone');
+  const [testCode, setTestCode] = useState<string>('');
+  const recaptchaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { 
-    locataire, 
-    deconnexion, 
-    isAuthenticated, 
+
+  const {
+    isLoading,
+    error,
+    isPhoneNumberSent,
+    isCodeVerified,
     isTestMode,
-    isInitialized // ✅ Nouveau: utiliser l'état d'initialisation du hook
+    isInitialized, // ✅ Nouveau
+    locataire,
+    envoyerCodeSMS,
+    verifierCodeSMS,
+    renvoyerCodeSMS,
+    isAuthenticated,
   } = useAuthSMS();
 
-  // États pour le formulaire d'upload
-  const [moisPayes, setMoisPayes] = useState(1);
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-  
-  // États pour les données réelles
-  const [immeubleData, setImmeubleData] = useState<Immeuble | null>(null);
-  const [appartementInfo, setAppartementInfo] = useState<{numero: string} | null>(null);
-  const [loadingData, setLoadingData] = useState(true);
-
-  // 🔑 CORRECTION: Vérifier l'authentification seulement après initialisation
+  // 🔑 CORRECTION: Rediriger seulement après initialisation
   useEffect(() => {
     if (!isInitialized) {
-      console.log('⏳ En attente d\'initialisation...');
+      console.log('⏳ Login: En attente d\'initialisation...');
       return;
     }
 
-    console.log('🔍 Vérification auth après initialisation:', {
-      hasLocataire: !!locataire,
-      isAuthenticated: isAuthenticated(),
-      isTestMode
-    });
-    
-    if (!isAuthenticated()) {
-      console.log('❌ Pas authentifié, redirection vers login');
-      router.push('/locataires/login');
-    } else {
-      console.log('✅ Authentifié, reste sur le dashboard');
+    if (isAuthenticated()) {
+      console.log('✅ Déjà authentifié, redirection vers dashboard');
+      router.push('/dashboard/locataires');
     }
-  }, [isInitialized, isAuthenticated, router, locataire, isTestMode]);
+  }, [isAuthenticated, router, isInitialized]);
 
-  // Charger les données réelles de l'immeuble
+  // Gérer le succès de la vérification
   useEffect(() => {
-    const chargerDonneesImmeuble = async () => {
-      if (!locataire?.immeubleId || !locataire?.appartementId) {
-        console.log('⚠️ Données locataire manquantes:', {
-          hasLocataire: !!locataire,
-          immeubleId: locataire?.immeubleId,
-          appartementId: locataire?.appartementId
-        });
-        setLoadingData(false);
-        return;
-      }
-
-      try {
-        setLoadingData(true);
-        console.log('🏢 Chargement données immeuble:', locataire.immeubleId);
-        
-        // 🔍 DEBUGGING: Vérifier l'état d'authentification Firebase
-        console.log('🔐 État Firebase Auth:', {
-          currentUser: !!auth.currentUser,
-          uid: auth.currentUser?.uid,
-          phoneNumber: auth.currentUser?.phoneNumber,
-          isTestMode
-        });
-        
-        // 🔍 DEBUGGING: Ajouter diagnostic si problème
-        console.log('🔍 Test diagnostic DB...');
-        await immeublesService.diagnostiquerDB();
-        
-        const result = await immeublesService.obtenirImmeuble(locataire.immeubleId);
-        console.log('📋 Résultat obtenirImmeuble:', result);
-        
-        if (result.success && result.data) {
-          setImmeubleData(result.data);
-          
-          // Chercher l'appartement dans les données de l'immeuble
-          const appartements = (result.data as any).appartements || [];
-          console.log('🏠 Appartements trouvés:', appartements.length);
-          console.log('🔍 Recherche appartement ID:', locataire.appartementId);
-          
-          const appartement = appartements.find((apt: any) => apt.id === locataire.appartementId);
-          console.log('🎯 Appartement trouvé:', appartement);
-          
-          if (appartement) {
-            setAppartementInfo({ numero: appartement.numero });
-          } else {
-            console.log('⚠️ Appartement non trouvé dans la liste');
-            setAppartementInfo({ numero: 'N/A' });
-          }
-          
-          console.log('✅ Données immeuble chargées avec succès');
-        } else {
-          console.log('❌ Échec chargement immeuble:', result.error);
-          setMessage(`❌ Impossible de charger les données de l'immeuble: ${result.error}`);
-        }
-      } catch (error) {
-        console.error('❌ Exception chargement immeuble:', error);
-        setMessage("❌ Erreur lors du chargement des données");
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    // Ne charger que si on est initialisé ET qu'on a un locataire
-    if (isInitialized && locataire) {
-      chargerDonneesImmeuble();
+    if (isCodeVerified && locataire) {
+      console.log('✅ Code vérifié, passage à l\'étape succès');
+      setStep('success');
+      // Redirection après 2 secondes
+      setTimeout(() => {
+        router.push('/dashboard/locataires');
+      }, 2000);
     }
-  }, [locataire, isInitialized]);
+  }, [isCodeVerified, locataire, router]);
 
-  // Gestion de la déconnexion
-  const handleLogout = async () => {
-    console.log('🚪 Déconnexion demandée');
-    const result = await deconnexion();
+  // Formater automatiquement les numéros
+  const formatPhoneNumber = (phone: string): string => {
+    let formatted = phone.trim().replace(/\s+/g, '').replace(/[-()]/g, '');
+    
+    // Détecter et formater le Canada
+    if (formatted.match(/^(\+1|1)?[2-9]\d{2}[2-9]\d{6}$/)) {
+      const digits = formatted.replace(/^\+?1?/, '');
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      }
+    }
+    
+    // Détecter et formater la Guinée
+    if (formatted.match(/^(\+224|224|0)?[6-7]\d{8}$/)) {
+      let digits = formatted.replace(/^(\+224|224|0)/, '');
+      if (digits.length === 9 && (digits.startsWith('6') || digits.startsWith('7'))) {
+        return `+224${digits}`;
+      }
+    }
+    
+    // Si déjà au bon format, vérifier et retourner
+    if (formatted.startsWith('+224') && formatted.length === 13) {
+      return formatted;
+    }
+    if (formatted.startsWith('+1') && formatted.length === 12) {
+      return formatted;
+    }
+    
+    return phone;
+  };
+
+  // Gérer l'envoi du numéro de téléphone
+  const handlePhoneSubmit = async () => {
+    if (!phoneNumber.trim()) {
+      return;
+    }
+
+    const formattedPhone = formatPhoneNumber(phoneNumber.trim());
+    
+    console.log('📱 Tentative envoi SMS à:', formattedPhone);
+    
+    const result = await envoyerCodeSMS(formattedPhone);
     if (result.success) {
-      router.push('/locataires/login');
-    }
-  };
-
-  // Gestion du drag & drop
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  // Sélection de fichier avec validation basique
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    console.log('📁 Fichier sélectionné:', selectedFile?.name || 'aucun');
-    
-    if (!selectedFile) return;
-
-    // Validation basique côté client
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-    if (!allowedTypes.includes(selectedFile.type)) {
-      console.log('❌ Type de fichier non autorisé:', selectedFile.type);
-      setMessage("❌ Veuillez sélectionner un fichier JPG, PNG ou PDF");
-      return;
-    }
-
-    console.log('✅ Fichier valide sélectionné:', {
-      name: selectedFile.name,
-      size: selectedFile.size,
-      type: selectedFile.type
-    });
-    
-    setFile(selectedFile);
-    setMessage(null); // Effacer les messages précédents
-  };
-
-  // Gestion du drag & drop avec validation
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const droppedFile = e.dataTransfer.files[0];
-    if (!droppedFile) return;
-
-    // Validation basique côté client
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-    if (!allowedTypes.includes(droppedFile.type)) {
-      setMessage("❌ Veuillez sélectionner un fichier JPG, PNG ou PDF");
-      return;
-    }
-
-    setFile(droppedFile);
-    setMessage(null);
-  };
-
-  // Soumission du formulaire
-  const handleSubmit = async (e: React.FormEvent) => {
-    console.log('🚀 HandleSubmit appelé !'); // ← LOG CRITIQUE
-    e.preventDefault();
-    
-    console.log('🔍 Vérification file:', !!file, file?.name);
-    if (!file) {
-      console.log('❌ Pas de fichier !');
-      setMessage("❌ Veuillez sélectionner un fichier");
-      return;
-    }
-
-    console.log('🔍 Vérification locataire:', !!locataire);
-    console.log('🔍 Vérification immeubleData:', !!immeubleData);
-    if (!locataire || !immeubleData) {
-      console.log('❌ Données manquantes !', { locataire: !!locataire, immeubleData: !!immeubleData });
-      setMessage("❌ Erreur : données manquantes");
-      return;
-    }
-
-    console.log('✅ Toutes les vérifications passées, début upload...');
-
-    // 🔍 DEBUGGING: Vérifier les données avant upload
-    console.log('🔍 Données pour upload:', {
-      locataireId: locataire.id,
-      appartementId: locataire.appartementId,
-      immeubleId: locataire.immeubleId,
-      moisPayes,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type
-    });
-
-    setLoading(true);
-    setMessage(null);
-
-    try {
-      // Simuler l'upload pour le mode test
-      if (isTestMode) {
-        console.log('🧪 Upload simulé en mode test');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        setMessage("✅ Reçu téléversé avec succès ! (Mode test)");
-        setFile(null);
-        setMoisPayes(1);
-        return;
+      setStep('code');
+      setPhoneNumber(formattedPhone);
+      if (result.testCode) {
+        setTestCode(result.testCode);
       }
-
-      // Upload réel vers Cloudinary via ton API
-      console.log('📤 Upload réel du fichier...');
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const uploadResponse = await fetch("/api/upload-recu", {
-        method: "POST",
-        body: formData,
-      });
-
-      console.log('📤 Réponse upload:', uploadResponse.status, uploadResponse.statusText);
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        console.error('❌ Erreur upload API:', errorData);
-        throw new Error(errorData.error || "Erreur lors de l'upload");
-      }
-
-      const { url: fichierUrl } = await uploadResponse.json();
-      console.log('✅ URL fichier obtenue:', fichierUrl);
-      
-      // Sauvegarder le reçu en base de données avec ton service
-      console.log('💾 Sauvegarde en Firestore...');
-      await recuService.creerRecu(
-        locataire.id,
-        locataire.appartementId,
-        moisPayes,
-        fichierUrl,
-        locataire.immeubleId
-      );
-
-      console.log('✅ Reçu sauvegardé avec succès');
-      setMessage("✅ Reçu téléversé avec succès ! Il sera examiné par le gestionnaire.");
-      setFile(null);
-      setMoisPayes(1);
-      
-    } catch (error: any) {
-      console.error('❌ Erreur upload complète:', error);
-      setMessage(`❌ ${error.message}`);
-    } finally {
-      setLoading(false);
-      // Effacer le message après 8 secondes
-      setTimeout(() => setMessage(null), 8000);
+      console.log('✅ SMS envoyé avec succès');
+    } else {
+      console.error('❌ Erreur envoi SMS:', result.error);
     }
   };
 
-  // 🔑 CORRECTION: Afficher un loader pendant l'initialisation
+  // Gérer la vérification du code
+  const handleCodeSubmit = async () => {
+    if (!verificationCode.trim() || verificationCode.length !== 6) {
+      return;
+    }
+
+    console.log('🔐 Vérification du code:', verificationCode);
+    
+    const result = await verifierCodeSMS(verificationCode);
+    if (result.success) {
+      console.log('✅ Code vérifié avec succès');
+    } else {
+      console.error('❌ Erreur vérification:', result.error);
+    }
+  };
+
+  // Retourner à l'étape du téléphone
+  const retourTelephone = () => {
+    setStep('phone');
+    setVerificationCode('');
+    setPhoneNumber('');
+    setTestCode('');
+  };
+
+  // Renvoyer le code
+  const handleRenvoiCode = async () => {
+    console.log('📱 Renvoi du code SMS');
+    const result = await renvoyerCodeSMS();
+    if (result.success) {
+      setVerificationCode('');
+      if (result.testCode) {
+        setTestCode(result.testCode);
+      }
+      console.log('✅ Code renvoyé avec succès');
+    } else {
+      console.error('❌ Erreur renvoi:', result.error);
+    }
+  };
+
+  // Utiliser le code de test automatiquement
+  const utiliserCodeTest = () => {
+    if (testCode) {
+      setVerificationCode(testCode);
+    }
+  };
+
+  // Gérer les touches clavier
+  const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      action();
+    }
+  };
+
+  // 🔑 NOUVEAU: Attendre l'initialisation
   if (!isInitialized) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Initialisation de votre espace...</p>
-          <p className="text-sm text-gray-400 mt-2">Chargement des données d'authentification</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Vérifier après initialisation
-  if (!locataire || !isAuthenticated()) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirection...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Loader pour les données de l'immeuble
-  if (loadingData) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement de vos données...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="text-gray-600 text-center">Initialisation...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto p-6 max-w-4xl">
-        {/* Header avec informations locataire */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Home className="w-8 h-8 text-blue-600" />
-              Espace Locataire
-            </h1>
-            <div className="mt-2 space-y-1">
-              <p className="text-lg text-gray-700">
-                <User className="w-4 h-4 inline mr-2" />
-                {locataire.prenom} {locataire.nom}
-                {isTestMode && <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">🧪 Test</span>}
-              </p>
-              {immeubleData && (
-                <>
-                  <p className="text-gray-600">
-                    <Building className="w-4 h-4 inline mr-2" />
-                    {immeubleData.nom} - Appartement {appartementInfo?.numero}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Propriétaire: {immeubleData.proprietaireActuel.prenom} {immeubleData.proprietaireActuel.nom}
-                  </p>
-                </>
-              )}
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mb-4 shadow-lg">
+            {step === 'success' ? (
+              <CheckCircle className="w-8 h-8 text-white" />
+            ) : isTestMode ? (
+              <TestTube className="w-8 h-8 text-white" />
+            ) : (
+              <Phone className="w-8 h-8 text-white" />
+            )}
           </div>
-          <Button onClick={handleLogout} variant="outline" className="mt-4 md:mt-0">
-            <LogOut className="w-4 h-4 mr-2" />
-            Se déconnecter
-          </Button>
-        </div>
+          <CardTitle className="text-2xl font-bold text-gray-900">
+            {step === 'success' ? 'Connexion réussie !' : 'Espace Locataire'}
+          </CardTitle>
+          <CardDescription className="text-base">
+            {step === 'phone' && 'Connectez-vous avec votre numéro de téléphone'}
+            {step === 'code' && (isTestMode ? 'Mode test - Saisissez le code' : 'Saisissez le code reçu par SMS')}
+            {step === 'success' && 'Redirection vers votre espace personnel...'}
+          </CardDescription>
+        </CardHeader>
 
-        {/* Messages de feedback */}
-        {message && (
-          <Alert className={`mb-6 ${
-            message.includes('✅') 
-              ? 'bg-green-50 border-green-200' 
-              : 'bg-red-50 border-red-200'
-          }`}>
-            <AlertDescription className={
-              message.includes('✅') ? 'text-green-800' : 'text-red-800'
-            }>
-              {message}
-            </AlertDescription>
-          </Alert>
-        )}
+        <CardContent className="space-y-6">
+          {/* Mode test indicator */}
+          {isTestMode && step === 'code' && (
+            <Alert className="bg-yellow-50 border-yellow-200">
+              <TestTube className="w-4 h-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 font-medium">
+                🧪 Mode développement activé
+              </AlertDescription>
+            </Alert>
+          )}
 
-        {/* Formulaire principal */}
-        <Card className="shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="w-5 h-5 text-blue-600" />
-              Téléverser un reçu de paiement
-            </CardTitle>
-            <CardDescription>
-              Sélectionnez le nombre de mois payés et uploadez votre reçu (PDF, JPG, PNG)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              
-              {/* 🔍 DEBUGGING: Log quand le form est soumis */}
-              <input type="hidden" onChange={() => console.log('🔍 Form submit handler attached')} />
-              
-              {/* Informations pré-remplies (grisées) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border">
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Locataire</Label>
-                  <p className="font-semibold text-gray-700">
-                    {locataire.prenom} {locataire.nom}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Appartement</Label>
-                  <p className="font-semibold text-gray-700">
-                    {appartementInfo?.numero || 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Immeuble</Label>
-                  <p className="font-semibold text-gray-700">
-                    {immeubleData?.nom || 'Chargement...'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Propriétaire</Label>
-                  <p className="font-semibold text-gray-700">
-                    {immeubleData?.proprietaireActuel 
-                      ? `${immeubleData.proprietaireActuel.prenom} ${immeubleData.proprietaireActuel.nom}`
-                      : 'Chargement...'
-                    }
-                  </p>
-                </div>
-              </div>
+          {/* Affichage des erreurs */}
+          {error && (
+            <Alert className="bg-red-50 border-red-200">
+              <AlertDescription className="text-red-800 font-medium">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
 
-              {/* Nombre de mois payés */}
+          {/* Étape 1: Saisie du numéro de téléphone */}
+          {step === 'phone' && (
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="moisPayes" className="text-sm font-medium">
-                  <Calendar className="w-4 h-4 inline mr-2" />
-                  Nombre de mois payés
+                <Label htmlFor="phone" className="text-sm font-medium">
+                  Numéro de téléphone
                 </Label>
                 <Input
-                  id="moisPayes"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={moisPayes}
-                  onChange={(e) => setMoisPayes(Number(e.target.value))}
-                  className="w-32"
-                  disabled={loading}
+                  id="phone"
+                  type="tel"
+                  placeholder="+1 XXX XXX XXXX ou +224 XXX XXX XXX"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="text-lg h-12"
+                  disabled={isLoading}
+                  onKeyDown={(e) => handleKeyDown(e, handlePhoneSubmit)}
                 />
-                <p className="text-xs text-gray-500">
-                  Entre 1 et 12 mois
+                <p className="text-sm text-gray-500">
+                  🇨🇦 Canada: +1XXXXXXXXXX • 🇬🇳 Guinée: +224XXXXXXXXX
                 </p>
               </div>
 
-              {/* Zone d'upload */}
-              <div className="space-y-4">
-                <Label className="text-sm font-medium">
-                  <FileText className="w-4 h-4 inline mr-2" />
-                  Reçu de paiement
-                </Label>
-                
-                <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                    isDragOver
-                      ? 'border-blue-400 bg-blue-50'
-                      : file
-                      ? 'border-green-400 bg-green-50'
-                      : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <input
-                    type="file"
-                    id="file-upload"
-                    className="hidden"
-                    accept="image/*,application/pdf"
-                    onChange={handleFileSelect}
-                    disabled={loading}
-                  />
-                  
-                  {file ? (
-                    <div className="space-y-3">
-                      <CheckCircle className="w-12 h-12 text-green-600 mx-auto" />
-                      <div>
-                        <p className="font-medium text-green-800">Fichier sélectionné</p>
-                        <p className="text-sm text-green-600 break-all font-mono">{file.name}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => document.getElementById('file-upload')?.click()}
-                        disabled={loading}
-                        className="mt-2"
-                      >
-                        Changer de fichier
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <FileText className="w-16 h-16 text-gray-400 mx-auto" />
-                      <div>
-                        <p className="text-lg font-medium text-gray-700">
-                          Glissez votre fichier ici ou cliquez pour sélectionner
-                        </p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          PDF, JPG, PNG (max 10MB)
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => document.getElementById('file-upload')?.click()}
-                        disabled={loading}
-                        className="bg-white"
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Sélectionner un fichier
-                      </Button>
-                    </div>
-                  )}
+              {/* Numéros de test suggestion */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-medium text-blue-800 mb-2">
+                  🧪 Numéros de test (développement)
+                </h4>
+                <div className="space-y-1 text-xs text-blue-700">
+                  <div className="flex justify-between">
+                    <span>Guinée:</span>
+                    <code className="bg-blue-100 px-1 rounded">+224628407335</code>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Canada:</span>
+                    <code className="bg-blue-100 px-1 rounded">+16111111111</code>
+                  </div>
                 </div>
               </div>
 
-              {/* Bouton de soumission */}
-              <Button
-                type="submit"
-                disabled={loading || !file}
-                className="w-full h-12 text-lg font-medium bg-blue-600 hover:bg-blue-700"
-                onClick={(e) => {
-                  // 🔍 DEBUGGING: Log de l'état du bouton
-                  console.log('🔘 BOUTON CLIQUÉ !');
-                  console.log('🔘 État du bouton:', {
-                    loading,
-                    hasFile: !!file,
-                    fileName: file?.name,
-                    disabled: loading || !file
-                  });
-                  
-                  // Si le form ne marche pas, test direct
-                  // handleSubmit(e as any);
-                }}
+              {/* Container pour reCAPTCHA */}
+              <div 
+                id="recaptcha-container" 
+                ref={recaptchaRef}
+                className="flex justify-center py-2"
+              />
+
+              <Button 
+                onClick={handlePhoneSubmit} 
+                className="w-full h-12 text-base font-medium"
+                disabled={isLoading || !phoneNumber.trim()}
               >
-                {loading ? (
+                {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Téléversement en cours...
+                    Envoi en cours...
                   </>
                 ) : (
                   <>
-                    <Upload className="w-5 h-5 mr-2" />
-                    Téléverser mon reçu
+                    <MessageSquare className="w-5 h-5 mr-2" />
+                    Recevoir le code SMS
                   </>
                 )}
               </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+
+          {/* Étape 2: Vérification du code SMS */}
+          {step === 'code' && (
+            <div className="space-y-4">
+              {/* Info numéro */}
+              <div className={`p-4 rounded-lg border ${
+                isTestMode ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'
+              }`}>
+                <div className="flex items-center space-x-2">
+                  {isTestMode ? (
+                    <TestTube className="w-4 h-4 text-yellow-600" />
+                  ) : (
+                    <MessageSquare className="w-4 h-4 text-green-600" />
+                  )}
+                  <p className={`text-sm font-medium ${
+                    isTestMode ? 'text-yellow-800' : 'text-green-800'
+                  }`}>
+                    {isTestMode ? `Mode test - Code: ${testCode}` : `Code envoyé au ${phoneNumber}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="code" className="text-sm font-medium">
+                    Code de vérification
+                  </Label>
+                  <Input
+                    id="code"
+                    type="text"
+                    placeholder="123456"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="text-2xl text-center tracking-widest h-14 font-mono"
+                    disabled={isLoading}
+                    maxLength={6}
+                    onKeyDown={(e) => {
+                      if (verificationCode.length === 6) {
+                        handleKeyDown(e, handleCodeSubmit);
+                      }
+                    }}
+                  />
+                  <p className="text-sm text-gray-500 text-center">
+                    Code à 6 chiffres {isTestMode ? '(mode test)' : 'reçu par SMS'}
+                  </p>
+                </div>
+
+                {/* Bouton pour utiliser le code de test */}
+                {isTestMode && testCode && (
+                  <Button 
+                    variant="outline"
+                    onClick={utiliserCodeTest}
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    <TestTube className="w-4 h-4 mr-2" />
+                    Utiliser le code test ({testCode})
+                  </Button>
+                )}
+
+                <Button 
+                  onClick={handleCodeSubmit} 
+                  className="w-full h-12 text-base font-medium"
+                  disabled={isLoading || verificationCode.length !== 6}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      Vérification...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Vérifier le code
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Actions secondaires */}
+              <div className="flex flex-col space-y-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleRenvoiCode}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Renvoyer le code
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  onClick={retourTelephone}
+                  disabled={isLoading}
+                  size="sm"
+                  className="w-full text-gray-600"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Changer de numéro
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Étape 3: Succès */}
+          {step === 'success' && (
+            <div className="space-y-4 text-center">
+              <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+                <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-green-800 mb-2">
+                  Bienvenue {locataire?.prenom} !
+                </h3>
+                <p className="text-green-700">
+                  Vous êtes maintenant connecté à votre espace locataire.
+                </p>
+                {isTestMode && (
+                  <p className="text-xs text-green-600 mt-2">
+                    🧪 Connexion en mode test
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Redirection automatique...</span>
+              </div>
+
+              <Button 
+                onClick={() => router.push('/dashboard/locataires')}
+                className="w-full"
+                variant="outline"
+              >
+                Accéder maintenant à mon espace
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
-export default LocataireDashboard;
+export default LocataireLoginPage;

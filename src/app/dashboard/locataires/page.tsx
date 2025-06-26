@@ -23,7 +23,6 @@ import { useAuthSMS } from '@/hooks/useAuthSMS';
 import { recuService } from '@/app/services/recusService';
 import { Immeuble } from '@/app/types';
 import { immeublesService } from '@/app/services/immeublesService';
-import { auth } from '@/lib/firebase'; // ✅ Ajout import
 
 const LocataireDashboard = () => {
   const router = useRouter();
@@ -72,11 +71,6 @@ const LocataireDashboard = () => {
   useEffect(() => {
     const chargerDonneesImmeuble = async () => {
       if (!locataire?.immeubleId || !locataire?.appartementId) {
-        console.log('⚠️ Données locataire manquantes:', {
-          hasLocataire: !!locataire,
-          immeubleId: locataire?.immeubleId,
-          appartementId: locataire?.appartementId
-        });
         setLoadingData(false);
         return;
       }
@@ -85,46 +79,27 @@ const LocataireDashboard = () => {
         setLoadingData(true);
         console.log('🏢 Chargement données immeuble:', locataire.immeubleId);
         
-        // 🔍 DEBUGGING: Vérifier l'état d'authentification Firebase
-        console.log('🔐 État Firebase Auth:', {
-          currentUser: !!auth.currentUser,
-          uid: auth.currentUser?.uid,
-          phoneNumber: auth.currentUser?.phoneNumber,
-          isTestMode
-        });
-        
-        // 🔍 DEBUGGING: Ajouter diagnostic si problème
-        console.log('🔍 Test diagnostic DB...');
-        await immeublesService.diagnostiquerDB();
-        
         const result = await immeublesService.obtenirImmeuble(locataire.immeubleId);
-        console.log('📋 Résultat obtenirImmeuble:', result);
         
         if (result.success && result.data) {
           setImmeubleData(result.data);
           
           // Chercher l'appartement dans les données de l'immeuble
           const appartements = (result.data as any).appartements || [];
-          console.log('🏠 Appartements trouvés:', appartements.length);
-          console.log('🔍 Recherche appartement ID:', locataire.appartementId);
-          
           const appartement = appartements.find((apt: any) => apt.id === locataire.appartementId);
-          console.log('🎯 Appartement trouvé:', appartement);
           
           if (appartement) {
             setAppartementInfo({ numero: appartement.numero });
           } else {
-            console.log('⚠️ Appartement non trouvé dans la liste');
             setAppartementInfo({ numero: 'N/A' });
           }
           
-          console.log('✅ Données immeuble chargées avec succès');
+          console.log('✅ Données immeuble chargées');
         } else {
-          console.log('❌ Échec chargement immeuble:', result.error);
-          setMessage(`❌ Impossible de charger les données de l'immeuble: ${result.error}`);
+          setMessage("❌ Impossible de charger les données de l'immeuble");
         }
       } catch (error) {
-        console.error('❌ Exception chargement immeuble:', error);
+        console.error('❌ Erreur chargement immeuble:', error);
         setMessage("❌ Erreur lors du chargement des données");
       } finally {
         setLoadingData(false);
@@ -160,24 +135,15 @@ const LocataireDashboard = () => {
   // Sélection de fichier avec validation basique
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
-    console.log('📁 Fichier sélectionné:', selectedFile?.name || 'aucun');
-    
     if (!selectedFile) return;
 
     // Validation basique côté client
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
     if (!allowedTypes.includes(selectedFile.type)) {
-      console.log('❌ Type de fichier non autorisé:', selectedFile.type);
       setMessage("❌ Veuillez sélectionner un fichier JPG, PNG ou PDF");
       return;
     }
 
-    console.log('✅ Fichier valide sélectionné:', {
-      name: selectedFile.name,
-      size: selectedFile.size,
-      type: selectedFile.type
-    });
-    
     setFile(selectedFile);
     setMessage(null); // Effacer les messages précédents
   };
@@ -203,36 +169,17 @@ const LocataireDashboard = () => {
 
   // Soumission du formulaire
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log('🚀 HandleSubmit appelé !'); // ← LOG CRITIQUE
     e.preventDefault();
     
-    console.log('🔍 Vérification file:', !!file, file?.name);
     if (!file) {
-      console.log('❌ Pas de fichier !');
       setMessage("❌ Veuillez sélectionner un fichier");
       return;
     }
 
-    console.log('🔍 Vérification locataire:', !!locataire);
-    console.log('🔍 Vérification immeubleData:', !!immeubleData);
     if (!locataire || !immeubleData) {
-      console.log('❌ Données manquantes !', { locataire: !!locataire, immeubleData: !!immeubleData });
       setMessage("❌ Erreur : données manquantes");
       return;
     }
-
-    console.log('✅ Toutes les vérifications passées, début upload...');
-
-    // 🔍 DEBUGGING: Vérifier les données avant upload
-    console.log('🔍 Données pour upload:', {
-      locataireId: locataire.id,
-      appartementId: locataire.appartementId,
-      immeubleId: locataire.immeubleId,
-      moisPayes,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type
-    });
 
     setLoading(true);
     setMessage(null);
@@ -258,19 +205,14 @@ const LocataireDashboard = () => {
         body: formData,
       });
 
-      console.log('📤 Réponse upload:', uploadResponse.status, uploadResponse.statusText);
-
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.json();
-        console.error('❌ Erreur upload API:', errorData);
         throw new Error(errorData.error || "Erreur lors de l'upload");
       }
 
       const { url: fichierUrl } = await uploadResponse.json();
-      console.log('✅ URL fichier obtenue:', fichierUrl);
       
       // Sauvegarder le reçu en base de données avec ton service
-      console.log('💾 Sauvegarde en Firestore...');
       await recuService.creerRecu(
         locataire.id,
         locataire.appartementId,
@@ -279,13 +221,12 @@ const LocataireDashboard = () => {
         locataire.immeubleId
       );
 
-      console.log('✅ Reçu sauvegardé avec succès');
       setMessage("✅ Reçu téléversé avec succès ! Il sera examiné par le gestionnaire.");
       setFile(null);
       setMoisPayes(1);
       
     } catch (error: any) {
-      console.error('❌ Erreur upload complète:', error);
+      console.error('❌ Erreur upload:', error);
       setMessage(`❌ ${error.message}`);
     } finally {
       setLoading(false);
@@ -394,9 +335,6 @@ const LocataireDashboard = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              
-              {/* 🔍 DEBUGGING: Log quand le form est soumis */}
-              <input type="hidden" onChange={() => console.log('🔍 Form submit handler attached')} />
               
               {/* Informations pré-remplies (grisées) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border">
@@ -529,19 +467,6 @@ const LocataireDashboard = () => {
                 type="submit"
                 disabled={loading || !file}
                 className="w-full h-12 text-lg font-medium bg-blue-600 hover:bg-blue-700"
-                onClick={(e) => {
-                  // 🔍 DEBUGGING: Log de l'état du bouton
-                  console.log('🔘 BOUTON CLIQUÉ !');
-                  console.log('🔘 État du bouton:', {
-                    loading,
-                    hasFile: !!file,
-                    fileName: file?.name,
-                    disabled: loading || !file
-                  });
-                  
-                  // Si le form ne marche pas, test direct
-                  // handleSubmit(e as any);
-                }}
               >
                 {loading ? (
                   <>

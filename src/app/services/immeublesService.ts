@@ -420,17 +420,15 @@ export const immeublesService = {
         const immeuble = { id: doc.id, ...data } as Immeuble;
 
         // Parcourir les appartements de cet immeuble
-        if (immeuble.appartements && Array.isArray(immeuble.appartements)) {
-          immeuble.appartements.forEach((apt: Appartement) => {
-            if (apt.statut === "libre") {
-              appartementsDisponibles.push({
-                id: apt.id,
-                nom: `Apt ${apt.numero} - ${immeuble.nom}`,
-                immeubleNom: immeuble.nom,
-              });
-            }
-          });
-        }
+        immeuble.appartements?.forEach((apt) => {
+          if (apt.statut === "libre") {
+            appartementsDisponibles.push({
+              id: apt.id,
+              nom: `Apt ${apt.numero} - ${immeuble.nom}`,
+              immeubleNom: immeuble.nom,
+            });
+          }
+        });
       });
 
       debugLog('Appartements disponibles trouvés:', appartementsDisponibles.length);
