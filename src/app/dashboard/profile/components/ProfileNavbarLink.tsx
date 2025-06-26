@@ -14,15 +14,15 @@ export function ProfileNavbarLink() {
 
   if (!user) return null;
 
-  const getInitials = (name: string) => {
-    if (!name) return "U";
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+//   const getInitials = (name: string) => {
+//     if (!name) return "U";
+//     return name
+//       .split(' ')
+//       .map(word => word[0])
+//       .join('')
+//       .toUpperCase()
+//       .slice(0, 2);
+//   };
 
   const handleProfileClick = () => {
     router.push('/dashboard/profile');

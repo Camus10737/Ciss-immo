@@ -30,11 +30,16 @@ import {
 
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Immeuble } from "@/app/types";
+<<<<<<< HEAD
 import { immeublesService } from "@/app/services/immeublesService"; // Correction ici
 import {
   CreateGestionnaireFormData,
   ImmeubleAssignment,
 } from "@/app/types/user-management";
+=======
+import { CreateGestionnaireFormData } from "@/app/types/user-management";
+import { DataFilterService } from "@/app/services/dataFilterService";
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
 import { UserManagementService } from "@/app/services/userManagementService";
 
 interface CreateGestionnaireModalProps {
@@ -293,10 +298,15 @@ export function CreateGestionnaireModal({
                 <Input
                   id="phone"
                   value={formData.phone}
+<<<<<<< HEAD
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, phone: e.target.value }))
                   }
                   placeholder="+224 XXX XXX XXX"
+=======
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+224 000 000 000"
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
                 />
               </div>
             </CardContent>

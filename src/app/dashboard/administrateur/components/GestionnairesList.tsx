@@ -74,7 +74,7 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
 
       if (result.success) {
         toast.success(`Gestionnaire ${newStatus === 'active' ? 'activé' : 'désactivé'}`);
-        loadGestionnaires(); // Recharger la liste
+        loadGestionnaires(); 
       } else {
         toast.error(result.error || "Erreur lors du changement de statut");
       }
@@ -110,10 +110,15 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
       );
 
       if (result.success) {
+<<<<<<< HEAD
         toast.success(
           `Immeuble${immeublesARetirer.length > 1 ? "s" : ""} retiré${immeublesARetirer.length > 1 ? "s" : ""} à ${gestionnaire.name}`
         );
         loadGestionnaires(); // Recharger la liste
+=======
+        toast.success(`Gestionnaire ${gestionnaireNom} supprimé`);
+        loadGestionnaires();
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
       } else {
         toast.error(result.error || "Erreur lors de la suppression");
       }

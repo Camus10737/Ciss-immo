@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+// src/app/dashboard/page.tsx
+
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
 "use client";
 
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
@@ -11,7 +16,6 @@ import {
   Calculator,
   BarChart3,
   LogOut,
-  User,
   Shield,
 } from "lucide-react";
 import { BuildingList } from "./immeubles/buildingList";
@@ -19,6 +23,10 @@ import TenantList from "./locataires/components/tenantList";
 import { ComptabiliteDetail } from "@/app/dashboard/comptabilite/ComptabiliteDetail";
 import { getLocataires } from "@/app/services/locatairesService";
 import { AdminSection } from "./administrateur/components/AdminSection";
+<<<<<<< HEAD
+=======
+
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
 import { ProfileNavbarLinkWithAvatar } from "./profile/components/ProfileNavbarLink";
 
 type Section = "immeubles" | "locataires" | "comptabilite" | "statistiques" | "administrateur";
@@ -219,7 +227,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header moderne */}
+      {/* Header  */}
       <div className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-gray-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -242,6 +250,10 @@ export default function DashboardPage() {
                   </span>
                 )}
               </div>
+<<<<<<< HEAD
+=======
+              
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
               <Button
                 onClick={handleLogout}
                 variant="outline"
@@ -256,7 +268,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Navigation moderne */}
+      {/* Navigation  */}
       <div className="bg-white/60 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-1 overflow-x-auto py-4">
@@ -301,7 +313,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Contenu principal */}
+      {/* Contenu  */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderSectionContent()}
       </div>

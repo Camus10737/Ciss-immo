@@ -13,7 +13,6 @@ import {
   User, 
   Mail, 
   Phone,
-  Building2,
   Save,
   ArrowLeft,
   Edit,
@@ -79,7 +78,7 @@ export default function ProfilePage() {
 
   const handleInputChange = (field: keyof ProfileFormData, value: string) => {
     // Ne permettre la modification que de l'email et du téléphone
-    if (field === 'name') return; // Le nom n'est pas modifiable
+    if (field === 'name') return; 
     
     setFormData(prev => ({
       ...prev,
@@ -105,7 +104,7 @@ export default function ProfilePage() {
         {
           email: formData.email.trim(),
           phone: formData.phone.trim()
-          // Ne pas inclure name car il n'est pas modifiable
+
         },
         user.uid
       );
@@ -199,7 +198,7 @@ export default function ProfilePage() {
         <CardContent className="space-y-6">
           {/* Formulaire d'informations */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Nom complet - NON MODIFIABLE */}
+
             <div className="space-y-2">
               <Label htmlFor="name" className="text-sm font-medium text-gray-500">
                 Nom complet (non modifiable)

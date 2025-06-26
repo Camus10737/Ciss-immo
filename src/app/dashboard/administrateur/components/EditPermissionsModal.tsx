@@ -76,6 +76,11 @@ export function EditPermissionsModal({
     setPermissions(prev => {
       const updated = { ...prev };
       const immeublePermissions = { ...updated[immeubleId] };
+<<<<<<< HEAD
+=======
+      
+      // Gérer les permissions imbriquées 
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
       if (path.includes('.')) {
         const [category, permission] = path.split('.');
         immeublePermissions[category as keyof ImmeublePermissions] = {
@@ -83,6 +88,10 @@ export function EditPermissionsModal({
           [permission]: value
         };
       } else {
+<<<<<<< HEAD
+=======
+        // Permission simple
+>>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
         (immeublePermissions as any)[path] = value;
       }
       updated[immeubleId] = immeublePermissions;
@@ -388,7 +397,7 @@ export function EditPermissionsModal({
             })}
           </div>
 
-          {/* Avertissement si changements */}
+          {/* Avertissement EN CAS changements */}
           {hasChanges && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-start space-x-3">
