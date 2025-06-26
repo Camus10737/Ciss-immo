@@ -13,6 +13,7 @@ interface BuildingFormProps {
   onSuccess: () => void;
   onCancel: () => void;
 }
+
 export function BuildingForm({
   immeuble,
   editMode,
@@ -35,15 +36,6 @@ export function BuildingForm({
   });
 
   const { canAddImmeuble } = useAuthWithRole();
-
-  // 🔒 Bloque l'accès au formulaire pour tous sauf le super admin
-  if (!canAddImmeuble()) {
-    return (
-      <div className="text-red-600 text-center font-semibold p-8">
-        Vous n'avez pas la permission d’ajouter ou modifier un immeuble.
-      </div>
-    );
-  }
 
   useEffect(() => {
     if (editMode && immeuble) {
@@ -101,11 +93,19 @@ export function BuildingForm({
     if (onSuccess) onSuccess();
   };
 
+  // 🔒 Bloque l'accès au formulaire pour tous sauf le super admin
+  if (!canAddImmeuble()) {
+    return (
+      <div className="text-red-600 text-center font-semibold p-8">
+        Vous n'avez pas la permission d’ajouter ou modifier un immeuble.
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       <div className="container mx-auto px-4 py-8 space-y-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* ...le reste de ton formulaire inchangé... */}
           {/* Informations générales */}
           <Card className="bg-white border-0 shadow-sm">
             <CardHeader className="pb-4">

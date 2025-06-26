@@ -64,10 +64,15 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
       const data = await UserManagementService.getGestionnaires();
       let filtered = data;
       if (!isSuperAdmin()) {
-        // Admin : ne voit que les gestionnaires qui ont AU MOINS un immeuble assigné par lui
+        // Correction : admin voit tous les gestionnaires assignés à AU MOINS un de ses immeubles
+        const adminImmeubleIds = (user.immeubles_assignes || []).map(im =>
+          typeof im === "string" ? im : im.id
+        );
         filtered = data.filter(g =>
           Array.isArray(g.immeubles_assignes) &&
-          g.immeubles_assignes.some(im => im.assignedBy === user.uid)
+          g.immeubles_assignes.some(im =>
+            adminImmeubleIds.includes(typeof im === "string" ? im : im.id)
+          )
         );
       }
       setGestionnaires(filtered);
@@ -239,10 +244,14 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
       {!loading && gestionnairesFiltered.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {gestionnairesFiltered.map((gestionnaire) => {
+            // Correction : admin voit tous les immeubles assignés à ses immeubles, pas seulement ceux assignés par lui
+            const adminImmeubleIds = (user.immeubles_assignes || []).map(im =>
+              typeof im === "string" ? im : im.id
+            );
             const immeublesToShow = isSuperAdmin()
               ? gestionnaire.immeubles_assignes || []
               : (gestionnaire.immeubles_assignes || []).filter(
-                  (im) => im.assignedBy === user?.uid
+                  (im) => adminImmeubleIds.includes(typeof im === "string" ? im : im.id)
                 );
             return (
               <Card key={gestionnaire.id} className="hover:shadow-md transition-shadow">
@@ -316,9 +325,10 @@ export function GestionnairesList({ onCreateClick, refreshKey }: GestionnairesLi
                     {immeublesToShow.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {immeublesToShow.slice(0, 3).map((im, index) => {
-                          const immeubleNom = immeublesAll.find(i => i.id === im.id)?.nom || im.id;
+                          const id = typeof im === "string" ? im : im.id;
+                          const immeubleNom = immeublesAll.find(i => i.id === id)?.nom || id;
                           return (
-                            <Badge key={im.id} variant="outline" className="text-xs">
+                            <Badge key={id} variant="outline" className="text-xs">
                               {immeubleNom}
                             </Badge>
                           );

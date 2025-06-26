@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,36 +40,58 @@ export function EditPermissionsModal({
   onClose, 
   onSuccess 
 }: EditPermissionsModalProps) {
-  const { user, isAdmin } = useAuthWithRole();
+  const { user, isAdmin, isSuperAdmin, immeublesAssignes: adminImmeublesAssignes } = useAuthWithRole();
   const [loading, setLoading] = useState(false);
   const [permissions, setPermissions] = useState<{ [immeubleId: string]: ImmeublePermissions }>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [immeublesAssignes, setImmeublesAssignes] = useState<string[]>([]);
   const [selectedImmeuble, setSelectedImmeuble] = useState<string>("");
 
-  // Charger les permissions actuelles quand le gestionnaire change
+  // Utilitaire pour extraire un id string
+  const extractId = (im: any) => String(typeof im === "string" ? im : im.id);
+
+  // Toujours convertir immeubles_assignes en tableau d'IDs (string)
   useEffect(() => {
     if (gestionnaire && isOpen) {
+      const ids = (gestionnaire.immeubles_assignes || []).map(extractId);
       const currentPermissions: { [immeubleId: string]: ImmeublePermissions } = {};
-      gestionnaire.immeubles_assignes.forEach(immeubleId => {
+      ids.forEach(immeubleId => {
         const existingPermissions = gestionnaire.permissions_supplementaires?.[immeubleId];
-        currentPermissions[immeubleId] = {
+        currentPermissions[immeubleId] = existingPermissions || {
           gestion_immeuble: { read: true, write: true },
           gestion_locataires: { read: true, write: true },
-          comptabilite: existingPermissions?.comptabilite || { read: false, write: false, export: false },
-          statistiques: existingPermissions?.statistiques || { read: false, export: false },
-          delete_immeuble: existingPermissions?.delete_immeuble || false
+          comptabilite: { read: false, write: false, export: false },
+          statistiques: { read: false, export: false },
+          delete_immeuble: false
         };
       });
       setPermissions(currentPermissions);
-      setImmeublesAssignes([...gestionnaire.immeubles_assignes]);
+      setImmeublesAssignes(ids);
       setHasChanges(false);
     }
   }, [gestionnaire, isOpen]);
 
+    // Correction : super admin voit tout, admin voit ses immeubles assignés
+  let immeublesAccessibles: Immeuble[] = [];
+  if (isSuperAdmin?.()) {
+    immeublesAccessibles = immeubles;
+  } else if (isAdmin?.()) {
+    // adminImmeublesAssignes peut contenir des ids ou des objets {id}
+    const adminImmeubleIds = (adminImmeublesAssignes || []).map(im => String(typeof im === "string" ? im : im.id));
+    immeublesAccessibles = immeubles.filter(im => adminImmeubleIds.includes(String(im.id)));
+  } else {
+    immeublesAccessibles = [];
+  }
+
+  // Les immeubles accessibles mais non encore assignés au gestionnaire
+  const immeublesNonAssignes = immeublesAccessibles.filter(
+    im => !immeublesAssignes.includes(String(im.id))
+  );
+
+  // Affiche le nom de l'immeuble
   const getImmeubleNom = (immeubleId: string) => {
-    const immeuble = immeubles.find(i => i.id === immeubleId);
-    return immeuble?.nom || `Immeuble ${typeof immeubleId === "string" ? immeubleId.slice(0, 8) : ""}`;
+    const immeuble = immeubles.find(i => String(i.id) === String(immeubleId));
+    return immeuble?.nom || "";
   };
 
   const updatePermission = (immeubleId: string, path: string, value: boolean) => {
@@ -91,7 +113,8 @@ export function EditPermissionsModal({
     setHasChanges(true);
   };
 
-  // Ajout d'un immeuble assigné (admin uniquement)
+  const canManageImmeubles = isAdmin?.() || isSuperAdmin?.();
+
   const handleAddImmeuble = () => {
     if (!selectedImmeuble) return;
     if (immeublesAssignes.includes(selectedImmeuble)) return;
@@ -110,7 +133,6 @@ export function EditPermissionsModal({
     setHasChanges(true);
   };
 
-  // Suppression d'un immeuble assigné (admin uniquement)
   const handleRemoveImmeuble = (immeubleId: string) => {
     setImmeublesAssignes(prev => prev.filter(id => id !== immeubleId));
     setPermissions(prev => {
@@ -125,7 +147,6 @@ export function EditPermissionsModal({
     if (!gestionnaire || !user?.uid) return;
     setLoading(true);
     try {
-      // Préparer les permissions pour la sauvegarde (exclure les permissions automatiques)
       const permissionsToSave: { [immeubleId: string]: any } = {};
       Object.entries(permissions).forEach(([immeubleId, immeublePermissions]) => {
         permissionsToSave[immeubleId] = {
@@ -135,7 +156,6 @@ export function EditPermissionsModal({
         };
       });
 
-      // Mettre à jour la liste des immeubles assignés
       const result = await UserManagementService.updateGestionnaireImmeublesEtPermissions(
         gestionnaire.id,
         immeublesAssignes,
@@ -151,7 +171,6 @@ export function EditPermissionsModal({
         toast.error(result.error || "Erreur lors de la mise à jour");
       }
     } catch (error) {
-      console.error('Erreur sauvegarde permissions:', error);
       toast.error("Erreur lors de la sauvegarde");
     } finally {
       setLoading(false);
@@ -165,9 +184,6 @@ export function EditPermissionsModal({
       <XCircle size={16} className="text-gray-400" />
     );
   };
-
-  // Liste des immeubles non encore assignés
-  const immeublesNonAssignes = immeubles.filter(im => !immeublesAssignes.includes(im.id));
 
   if (!gestionnaire) return null;
 
@@ -203,8 +219,8 @@ export function EditPermissionsModal({
             </div>
           </div>
 
-          {/* Ajout d'un immeuble (admin uniquement) */}
-          {isAdmin() && (
+          {/* Ajout d'un immeuble (admin ou super admin) */}
+          {canManageImmeubles && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-2">
               <div className="flex items-center gap-3">
                 <select
@@ -215,7 +231,7 @@ export function EditPermissionsModal({
                   <option value="">Sélectionner un immeuble à ajouter</option>
                   {immeublesNonAssignes.map(im => (
                     <option key={im.id} value={im.id}>
-                      {im.nom} ({typeof im.id === "string" ? im.id.slice(0, 8) : ""}...)
+                      {im.nom} {im.quartier ? `(${im.quartier}, ${im.ville})` : ""}
                     </option>
                   ))}
                 </select>
@@ -234,9 +250,25 @@ export function EditPermissionsModal({
 
           {/* Configuration par immeuble */}
           <div className="space-y-4">
+            {immeublesAssignes.length === 0 && (
+              <div className="text-gray-500 text-sm">
+                Aucun immeuble assigné à ce gestionnaire.
+              </div>
+            )}
             {immeublesAssignes.map((immeubleId) => {
-              const immeublePermissions = permissions[immeubleId];
-              if (!immeublePermissions) return null;
+              let immeublePermissions = permissions[immeubleId];
+
+              if (!immeublePermissions) {
+                immeublePermissions = {
+                  gestion_immeuble: { read: true, write: true },
+                  gestion_locataires: { read: true, write: true },
+                  comptabilite: { read: false, write: false, export: false },
+                  statistiques: { read: false, export: false },
+                  delete_immeuble: false
+                };
+              }
+
+              const immeuble = immeubles.find(i => String(i.id) === String(immeubleId));
 
               return (
                 <Card key={immeubleId} className="border-gray-200">
@@ -244,13 +276,18 @@ export function EditPermissionsModal({
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg flex items-center space-x-3">
                         <Building2 size={20} className="text-indigo-600" />
-                        <span>{getImmeubleNom(immeubleId)}</span>
+                        <span>
+                          {immeuble?.nom || "Immeuble inconnu"}
+                          <span className="text-xs text-gray-500 ml-2">
+                            {immeuble ? `${immeuble.quartier}, ${immeuble.ville}` : ""}
+                          </span>
+                        </span>
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">
-                          ID: {typeof immeubleId === "string" ? immeubleId.slice(0, 8) : ""}...
+                          {immeuble?.type || ""}
                         </Badge>
-                        {isAdmin() && (
+                        {canManageImmeubles && (
                           <Button
                             type="button"
                             size="icon"

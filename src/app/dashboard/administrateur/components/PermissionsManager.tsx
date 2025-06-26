@@ -7,12 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Shield, 
-  User, 
   Building2, 
-  Settings, 
   Calculator,
   BarChart3,
-  Trash2,
   RefreshCw,
   Edit,
   CheckCircle,
@@ -20,7 +17,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { UserManagementService } from "@/app/services/userManagementService";
-import { DataFilterService } from "@/app/services/dataFilterService";
+import { immeublesService } from "@/app/services/immeublesService";
 import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Gestionnaire } from "@/app/types/user-management";
 import { Immeuble } from "@/app/types/index";
@@ -32,7 +29,6 @@ interface PermissionsManagerProps {
   refreshKey: number;
 }
 
-// Correction : export par défaut pour correspondre à l'import default
 export default function PermissionsManager({ refreshKey }: PermissionsManagerProps) {
   const { user } = useAuthWithRole();
   const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
@@ -44,19 +40,26 @@ export default function PermissionsManager({ refreshKey }: PermissionsManagerPro
   // Charger les données
   const loadData = async () => {
     if (!user?.uid) return;
-    
     setLoading(true);
     try {
-      const [gestionnaireData, immeublesData] = await Promise.all([
+      const [gestionnaireData, immeublesDataResult] = await Promise.all([
         UserManagementService.getGestionnaires({ status: 'active' }),
-        DataFilterService.getFilteredImmeubles(user.uid)
+        immeublesService.obtenirImmeubles({})
       ]);
-      
       setGestionnaires(gestionnaireData);
-      setImmeubles(immeublesData);
-      console.log('📋 Données permissions chargées:', { gestionnaireData, immeublesData });
+
+      // Correction : s'assurer que c'est bien un tableau
+      let immeublesArray: Immeuble[] = [];
+      if (Array.isArray(immeublesDataResult)) {
+        immeublesArray = immeublesDataResult;
+      } else if (
+        immeublesDataResult &&
+        Array.isArray(immeublesDataResult.data)
+      ) {
+        immeublesArray = immeublesDataResult.data;
+      }
+      setImmeubles(immeublesArray);
     } catch (error) {
-      console.error('Erreur chargement permissions:', error);
       toast.error("Erreur lors du chargement des permissions");
     } finally {
       setLoading(false);
@@ -65,6 +68,7 @@ export default function PermissionsManager({ refreshKey }: PermissionsManagerPro
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid, refreshKey]);
 
   const getImmeubleNom = (immeubleId: string) => {
@@ -115,8 +119,8 @@ export default function PermissionsManager({ refreshKey }: PermissionsManagerPro
 
   // Gestion du succès de modification des permissions
   const handlePermissionsSuccess = () => {
-    loadData(); // Recharger les données
-    setSelectedGestionnaire(null); // Fermer la modal
+    setSelectedGestionnaire(null); // Fermer la modal uniquement
+    // Le parent (AdminSection) doit incrémenter refreshKey pour recharger les données si besoin
   };
 
   // Si un immeuble est sélectionné, afficher ses détails
@@ -253,24 +257,26 @@ export default function PermissionsManager({ refreshKey }: PermissionsManagerPro
 
                 {gestionnaire.immeubles_assignes && gestionnaire.immeubles_assignes.length > 0 ? (
                   <div className="space-y-3">
-                    {gestionnaire.immeubles_assignes.map((immeubleId) => {
-                      const permissions = gestionnaire.permissions_supplementaires?.[immeubleId];
+                    {gestionnaire.immeubles_assignes.map((immeuble) => {
+                      // Correction : supporte string ou objet {id}
+                      const id = typeof immeuble === "string" ? immeuble : immeuble.id;
+                      const permissions = gestionnaire.permissions_supplementaires?.[id];
                       return (
-                        <div key={immeubleId} className="bg-gray-50 rounded-lg p-4">
+                        <div key={id} className="bg-gray-50 rounded-lg p-4">
                           <div className="flex justify-between items-start mb-3">
                             <button
-                              onClick={() => handleImmeubleClick(immeubleId)}
+                              onClick={() => handleImmeubleClick(id)}
                               className="text-left hover:text-blue-600 transition-colors"
                             >
                               <h4 className="font-medium text-gray-900 hover:text-blue-600 underline cursor-pointer">
-                                {getImmeubleNom(immeubleId)}
+                                {getImmeubleNom(id)}
                               </h4>
                               <p className="text-xs text-gray-500 mt-1">
                                 Cliquez pour voir les détails
                               </p>
                             </button>
                             <Badge variant="outline" className="text-xs">
-                              ID: {typeof immeubleId === "string" ? immeubleId.slice(0, 8) : ""}
+                              ID: {typeof id === "string" ? id.slice(0, 8) : ""}
                             </Badge>
                           </div>
 
