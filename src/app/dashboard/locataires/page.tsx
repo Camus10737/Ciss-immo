@@ -31,7 +31,7 @@ const LocataireDashboard = () => {
     deconnexion, 
     isAuthenticated, 
     isTestMode,
-    isInitialized // ✅ Nouveau: utiliser l'état d'initialisation du hook
+    isInitialized 
   } = useAuthSMS();
 
   // États pour le formulaire d'upload
@@ -46,7 +46,7 @@ const LocataireDashboard = () => {
   const [appartementInfo, setAppartementInfo] = useState<{numero: string} | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
-  // 🔑 CORRECTION: Vérifier l'authentification seulement après initialisation
+  //  Vérifier l'authentification seulement après initialisation
   useEffect(() => {
     if (!isInitialized) {
       console.log('⏳ En attente d\'initialisation...');
@@ -235,7 +235,7 @@ const LocataireDashboard = () => {
     }
   };
 
-  // 🔑 CORRECTION: Afficher un loader pendant l'initialisation
+  //  Afficher un loader pendant l'initialisation
   if (!isInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
