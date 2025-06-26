@@ -22,11 +22,7 @@ import { useAuthWithRole } from "@/hooks/useAuthWithRole";
 import { Gestionnaire } from "@/app/types/user-management";
 import { Immeuble } from "@/app/types/index";
 import { BuildingDetail } from "../../immeubles/buildingDetail";
-<<<<<<< HEAD
-import { EditPermissionsModal } from "./EditPermissionsModal";
-=======
 import { EditPermissionsModal } from "./EditPermissionsModal"; 
->>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
 import { toast } from "sonner";
 
 interface PermissionsManagerProps {
@@ -114,11 +110,7 @@ export default function PermissionsManager({ refreshKey }: PermissionsManagerPro
     );
   };
 
-<<<<<<< HEAD
-  // Gestion du succès de modification des permissions
-=======
   //  Gestion du succès de modification des permissions
->>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
   const handlePermissionsSuccess = () => {
     loadData(); 
     setSelectedGestionnaire(null);
@@ -357,11 +349,7 @@ export default function PermissionsManager({ refreshKey }: PermissionsManagerPro
         ))}
       </div>
 
-<<<<<<< HEAD
-      {/* Modal de modification des permissions */}
-=======
       /* Modal de modification des permissions */
->>>>>>> 02ff611ab56871b546c1b98e12a61e36024d46be
       <EditPermissionsModal
         gestionnaire={selectedGestionnaire}
         immeubles={immeubles}
