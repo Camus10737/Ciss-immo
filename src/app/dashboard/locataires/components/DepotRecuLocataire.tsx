@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useAuthSMS } from "@/hooks/useAuthSMS";
 import { recuService } from "@/app/services/recusService";
@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 export function DepotRecuLocataire() {
   const { locataire, locataireUser, isLoading, isInitialized, deconnexion, isAuthenticated } = useAuthSMS();
   const router = useRouter();
+  const pathname = usePathname();
   const [moisPayes, setMoisPayes] = useState(1);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,12 +37,16 @@ export function DepotRecuLocataire() {
     fetchImmeubleNom();
   }, [locataire?.immeubleId]);
 
-  // Redirection après déconnexion
+  // Redirection après déconnexion (évite la boucle si déjà sur la page login)
   useEffect(() => {
-    if (isInitialized && !isAuthenticated()) {
+    if (
+      isInitialized &&
+      !isAuthenticated &&
+      pathname !== "/locataires/login"
+    ) {
       router.replace("/locataires/login");
     }
-  }, [isInitialized, isAuthenticated, router]);
+  }, [isInitialized, isAuthenticated, router, pathname]);
 
   if (!isInitialized) return <div className="p-8 text-center">Chargement...</div>;
   if (!locataire) return <div className="p-8 text-center text-red-600">Non authentifié.</div>;
