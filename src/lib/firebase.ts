@@ -5,12 +5,12 @@ import { getFirestore } from 'firebase/firestore';
 
 // Configuration Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyD5md30kvP0nKQ2uUT1n-RGHQzntmIu5uo",
-  authDomain: "ciss-immo.firebaseapp.com",
-  projectId: "ciss-immo",
-  storageBucket: "ciss-immo.firebasestorage.app",
-  messagingSenderId: "678705301941",
-  appId: "1:678705301941:web:7cdcc7e6a8b71b3a3471fc"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
 // Initialise Firebase

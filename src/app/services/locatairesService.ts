@@ -33,13 +33,12 @@ export const createLocataire = async (
   userId: string
 ): Promise<string> => {
   try {
-    // Récupère l'immeubleId à partir de l'appartementId
     const immeubleId = await synchronisationService.trouverImmeubleParAppartement(locataireData.appartementId);
 
     const docData: any = {
       ...locataireData,
       userId,
-      immeubleId, // <-- Ajout du champ immeubleId
+      immeubleId,
       dateEntree: Timestamp.fromDate(locataireData.dateEntree),
       finBailProbable: locataireData.finBailProbable 
         ? Timestamp.fromDate(locataireData.finBailProbable) 
@@ -48,29 +47,21 @@ export const createLocataire = async (
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
-    
-    // Nettoyer les valeurs undefined
     Object.keys(docData).forEach(key => {
       if (docData[key] === undefined) {
         delete docData[key];
       }
     });
-    
     const docRef = await addDoc(collection(db, COLLECTION_NAME), docData);
-    
-    // 🔥 Synchroniser avec l'immeuble
     const nouveauLocataire: Locataire = {
       ...convertFirestoreData(docData),
       id: docRef.id,
     };
-    
-    // Utilise la variable immeubleId déjà déclarée plus haut
     await synchronisationService.assignerLocataireAAppartement(
       immeubleId,
       locataireData.appartementId,
       nouveauLocataire
     );
-    
     return docRef.id;
   } catch (error) {
     console.error('Erreur lors de la création du locataire:', error);
@@ -78,11 +69,10 @@ export const createLocataire = async (
   }
 };
 
-// Récupérer tous les locataires d'une liste d'immeubles (NOUVELLE FONCTION)
+// Récupérer tous les locataires d'une liste d'immeubles
 export const getLocatairesByImmeubles = async (immeubleIds: string[]): Promise<Locataire[]> => {
   try {
     if (!immeubleIds.length) return [];
-    // Firestore n'autorise que 10 éléments dans un "in", donc on découpe si besoin
     const allLocataires: Locataire[] = [];
     const chunkSize = 10;
     for (let i = 0; i < immeubleIds.length; i += chunkSize) {
@@ -107,7 +97,7 @@ export const getLocatairesByImmeubles = async (immeubleIds: string[]): Promise<L
   }
 };
 
-// Récupérer tous les locataires d'un utilisateur (ANCIEN, À NE PLUS UTILISER POUR L'AFFICHAGE)
+// Récupérer tous les locataires d'un utilisateur
 export const getLocataires = async (userId: string): Promise<Locataire[]> => {
   try {
     const q = query(
@@ -115,7 +105,6 @@ export const getLocataires = async (userId: string): Promise<Locataire[]> => {
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
-    
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       ...convertFirestoreData(doc.data()),
@@ -132,7 +121,6 @@ export const getLocataireById = async (id: string): Promise<Locataire | null> =>
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
     const docSnap = await getDoc(docRef);
-    
     if (docSnap.exists()) {
       return {
         ...convertFirestoreData(docSnap.data()),
@@ -146,7 +134,7 @@ export const getLocataireById = async (id: string): Promise<Locataire | null> =>
   }
 };
 
-// 🔥 Récupérer les locataires d'un appartement spécifique
+// Récupérer les locataires d'un appartement spécifique
 export const getLocatairesByAppartement = async (appartementId: string): Promise<Locataire[]> => {
   try {
     const q = query(
@@ -154,7 +142,6 @@ export const getLocatairesByAppartement = async (appartementId: string): Promise
       where('appartementId', '==', appartementId),
       orderBy('dateEntree', 'desc')
     );
-    
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       ...convertFirestoreData(doc.data()),
@@ -166,7 +153,7 @@ export const getLocatairesByAppartement = async (appartementId: string): Promise
   }
 };
 
-// 🔥 Récupérer le locataire actuel d'un appartement
+// Récupérer le locataire actuel d'un appartement
 export const getLocataireActuelByAppartement = async (appartementId: string): Promise<Locataire | null> => {
   try {
     const q = query(
@@ -174,17 +161,14 @@ export const getLocataireActuelByAppartement = async (appartementId: string): Pr
       where('appartementId', '==', appartementId),
       where('dateSortie', '==', null)
     );
-    
     const querySnapshot = await getDocs(q);
-    
     if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0]; // Il ne devrait y en avoir qu'un
+      const doc = querySnapshot.docs[0];
       return {
         ...convertFirestoreData(doc.data()),
         id: doc.id,
       };
     }
-    
     return null;
   } catch (error) {
     console.error('Erreur lors de la récupération du locataire actuel:', error);
@@ -199,23 +183,18 @@ export const updateLocataire = async (
   ancienAppartementId?: string
 ): Promise<void> => {
   try {
-    // 1. Récupérer les données actuelles du locataire
     const locataireActuel = await getLocataireById(id);
     if (!locataireActuel) {
       throw new Error('Locataire introuvable');
     }
-
     const docRef = doc(db, COLLECTION_NAME, id);
     const updateData: any = {
       ...locataireData,
       updatedAt: Timestamp.now(),
     };
-    
-    // Convertir les dates en Timestamp
     if (locataireData.dateEntree) {
       updateData.dateEntree = Timestamp.fromDate(locataireData.dateEntree);
     }
-    
     if (locataireData.finBailProbable !== undefined) {
       if (locataireData.finBailProbable) {
         updateData.finBailProbable = Timestamp.fromDate(locataireData.finBailProbable);
@@ -223,44 +202,34 @@ export const updateLocataire = async (
         updateData.finBailProbable = null;
       }
     }
-    
-    // Nettoyer les valeurs undefined
     Object.keys(updateData).forEach(key => {
       if (updateData[key] === undefined) {
         delete updateData[key];
       }
     });
-    
-    // 2. Mettre à jour le locataire
     await updateDoc(docRef, updateData);
-    
-    // 3. 🔥 SYNCHRONISER avec l'immeuble si l'appartement a changé
     if (locataireData.appartementId && locataireData.appartementId !== locataireActuel.appartementId) {
       const locataireMisAJour: Locataire = {
         ...locataireActuel,
         ...locataireData,
         updatedAt: new Date()
       } as Locataire;
-      
       await synchronisationService.mettreAJourLocataireDansAppartement(
-        locataireActuel.appartementId, // ancien appartement
-        locataireData.appartementId,   // nouvel appartement
+        locataireActuel.appartementId,
+        locataireData.appartementId,
         locataireMisAJour
       );
     } else if (locataireData.nom || locataireData.prenom || locataireData.email || locataireData.telephone) {
-      // Juste une mise à jour des infos sans changement d'appartement
       const locataireMisAJour: Locataire = {
         ...locataireActuel,
         ...locataireData,
         updatedAt: new Date()
       } as Locataire;
-      
       await synchronisationService.mettreAJourInfosLocataire(
         locataireActuel.appartementId,
         locataireMisAJour
       );
     }
-    
   } catch (error) {
     console.error('Erreur lors de la mise à jour du locataire:', error);
     throw error;
@@ -272,17 +241,12 @@ export const marquerSortieLocataire = async (id: string): Promise<void> => {
   try {
     const locataire = await getLocataireById(id);
     if (!locataire) throw new Error('Locataire introuvable');
-
-    // Met à jour la date de sortie du locataire
     const docRef = doc(db, COLLECTION_NAME, id);
     await updateDoc(docRef, {
       dateSortie: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
-
-    // Libère l'appartement immédiatement
     await synchronisationService.libererAppartement(locataire.appartementId, id);
-
   } catch (error) {
     console.error('Erreur lors du marquage de sortie:', error);
     throw error;
@@ -292,16 +256,91 @@ export const marquerSortieLocataire = async (id: string): Promise<void> => {
 // Supprimer un locataire
 export const deleteLocataire = async (id: string): Promise<void> => {
   try {
-    // Récupérer les infos du locataire avant suppression
     const locataire = await getLocataireById(id);
     if (locataire && !locataire.dateSortie) {
-      // Si le locataire est encore actif, libérer l'appartement
       await synchronisationService.libererAppartement(locataire.appartementId, id);
     }
-    
     await deleteDoc(doc(db, COLLECTION_NAME, id));
   } catch (error) {
     console.error('Erreur lors de la suppression du locataire:', error);
     throw error;
   }
+};
+
+// --- FONCTIONS POUR AUTH SMS ---
+
+/**
+ * Récupérer un locataire par téléphone (pour l'auth SMS)
+ */
+export async function getLocataireByTelephone(phoneNumber: string) {
+  try {
+    const q = query(
+      collection(db, "locataires"),
+      where("telephone", "==", phoneNumber)
+    );
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      const data = docSnap.data();
+      return {
+        ...convertFirestoreData(data),
+        id: data.userId || docSnap.id,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Erreur lors de la récupération du locataire par téléphone:', error);
+    return null;
+  }
+}
+
+/**
+ * Activer le compte locataire (exemple : set un champ "compteActive" à true)
+ */
+export const activerCompteLocataire = async (locataireId: string): Promise<void> => {
+  try {
+    if (!locataireId) return;
+    const docRef = doc(db, COLLECTION_NAME, locataireId);
+    await updateDoc(docRef, {
+      compteActive: true,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Erreur lors de l’activation du compte locataire:', error);
+    // Ne throw pas pour ne pas bloquer l'auth
+  }
+};
+
+/**
+ * Détecter un numéro de test (pour usage éventuel dans l'UI ou les tests)
+ */
+export const isTestNumber = (phone: string) => {
+  const testNumbers = [
+    "+224628407335",
+    "+14383786656",
+    // Ajoute ici tous tes numéros de test
+  ];
+  return testNumbers.includes(phone);
+};
+
+/**
+ * Obtenir les données de test associées à un numéro de test
+ */
+export const getTestData = (phone: string) => {
+  const testData: Record<string, { code: string; locataire: any }> = {
+    "+14383786656": {
+      code: "123456",
+      locataire: {
+        id: "yrElTiV0cmRIx68EPplPNQgtKSn1",
+        nom: "bah",
+        prenom: "madji",
+        telephone: "+14383786656",
+        immeubleId: "YqXWbWeOxw20GHLI65HX",
+        appartementId: "apt_1750896754017_1",
+      }
+    },
+    // ...autres numéros de test
+  };
+  return testData[phone];
 };
