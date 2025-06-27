@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2 } from "lucide-react";
 
 export default function LocataireLoginPage() {
-  const { connecterLocataire, isLoading, error, isAuthenticated, locataire } = useAuthSMSContext();
+  const { connecterLocataire, isLoading, error, isAuthenticated, locataire, isInitialized } = useAuthSMSContext();
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
@@ -21,16 +21,24 @@ export default function LocataireLoginPage() {
   };
 
   useEffect(() => {
-    // Redirige uniquement si on est authentifié ET pas déjà sur la page cible
+    // Redirige uniquement si l'état est initialisé, authentifié et pas déjà sur la page cible
     if (
+      isInitialized &&
       isAuthenticated &&
       locataire &&
       pathname !== "/dashboard/espace-locataire"
     ) {
       router.replace("/dashboard/espace-locataire");
     }
-    // Ne jamais rediriger si on est déjà sur la page cible
-  }, [isAuthenticated, locataire, router, pathname]);
+  }, [isInitialized, isAuthenticated, locataire, router, pathname]);
+
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div>Chargement...</div>
+      </div>
+    );
+  }
 
   // Affiche le formulaire tant qu'on n'est pas authentifié
   return (

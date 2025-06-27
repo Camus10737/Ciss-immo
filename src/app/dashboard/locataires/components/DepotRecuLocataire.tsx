@@ -48,10 +48,19 @@ export function DepotRecuLocataire() {
     }
   }, [isInitialized, isAuthenticated, router, pathname]);
 
-  if (!isInitialized) return <div className="p-8 text-center">Chargement...</div>;
-  if (!locataire) return <div className="p-8 text-center text-red-600">Non authentifié.</div>;
+  // Handler de déconnexion qui force la navigation (évite la boucle)
+  const handleDeconnexion = async () => {
+    await deconnexion();
+    // On attend que le provider mette à jour l'état avant de rediriger
+    setTimeout(() => {
+      router.replace("/locataires/login");
+    }, 0);
+  };
 
-  const nomLocataire = `${locataire.prenom} ${locataire.nom}`;
+  if (!isInitialized) return <div className="p-8 text-center">Chargement...</div>;
+  if (!isAuthenticated) return null;
+
+  const nomLocataire = `${locataire?.prenom ?? ""} ${locataire?.nom ?? ""}`;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFile(e.target.files?.[0] || null);
@@ -104,7 +113,7 @@ export function DepotRecuLocataire() {
           type="button"
           variant="outline"
           className="border-red-500 text-red-600 hover:bg-red-50"
-          onClick={deconnexion}
+          onClick={handleDeconnexion}
         >
           Déconnexion
         </Button>
